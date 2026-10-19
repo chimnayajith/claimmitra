@@ -16,7 +16,7 @@ class CaseDatabase {
     _database = await databaseFactoryFfi.openDatabase(
       file,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE cases (
@@ -33,6 +33,9 @@ class CaseDatabase {
               case_filed_date TEXT,
               evidence_date TEXT,
               award_date TEXT,
+              award_type TEXT,
+              award_amount REAL,
+              award_amount_interest_cost REAL,
               deposit_date TEXT,
               deposit_amount REAL,
               fees_received_date TEXT,
@@ -46,6 +49,13 @@ class CaseDatabase {
           ''');
           await db.execute('CREATE INDEX idx_cases_received_date ON cases(received_date)');
           await db.execute('CREATE INDEX idx_cases_case_number ON cases(case_number)');
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            await db.execute('ALTER TABLE cases ADD COLUMN award_type TEXT');
+            await db.execute('ALTER TABLE cases ADD COLUMN award_amount REAL');
+            await db.execute('ALTER TABLE cases ADD COLUMN award_amount_interest_cost REAL');
+          }
         },
       ),
     );

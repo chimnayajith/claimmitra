@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>ClaimMitra icon</title>
+  <g>
+    <!-- Angular folded document mark; transparent canvas, no background tile. -->
+    <path fill="#0F2A56" d="M44 55 127 10 127 225 74 194 44 177Z"/>
+    <path fill="#2563EB" d="M127 10 190 47 190 151 160 169 160 73 127 54Z"/>
+    <path fill="#0F2A56" d="M44 55 127 10 127 54 82 80 82 169 127 195 127 225 74 194 44 177Z"/>
+    <path fill="#FFFFFF" d="M82 80 127 54 160 73 160 169 127 195 82 169Z"/>
+    <path fill="#0F2A56" d="M101 105 Q101 101 106 103 L139 115 Q143 117 143 122 Q143 126 138 124 L105 112 Q101 111 101 105Z"/>
+    <path fill="#0F2A56" d="M101 130 Q101 126 106 128 L139 140 Q143 142 143 147 Q143 151 138 149 L105 137 Q101 136 101 130Z"/>
+    <circle cx="177" cy="186" r="21" fill="#F59E0B"/>
+  </g>
+</svg>

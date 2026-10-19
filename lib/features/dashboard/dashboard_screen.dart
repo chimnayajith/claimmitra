@@ -50,14 +50,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final urgent = cases.where((c) => _status(c) == 'Overdue').length;
         final due = cases.where((c) => _status(c) == 'Due Soon').length;
         final healthy = cases.where((c) => _status(c) == 'Healthy').length;
-        int police = 0, filing = 0, deposit = 0, fees = 0, ep = 0;
-        for (final c in cases) {
-          if (!c.isClosed && c.policeDocumentsDate == null) police++;
-          if (!c.isClosed && c.caseFiledDate == null && c.policeDocumentsDate != null) filing++;
-          if (!c.isClosed && c.awardDate != null && c.depositDate == null) deposit++;
-          if (!c.isClosed && c.depositDate != null && c.feesReceivedDate == null) fees++;
-          if (!c.isClosed && c.awardDate != null && c.depositDate == null && !DateTime.now().isBefore(DeadlineService.addMonths(c.awardDate!,4))) ep++;
+        final now = DateTime.now();
+        Map<String, int> countsFor(String stage) {
+          var yellow = 0, orange = 0, red = 0;
+          for (final c in cases) {
+            if (c.isClosed) continue;
+            DateTime? orangeAt, redAt;
+            bool pending = false;
+            switch (stage) {
+              case 'police':
+                pending = c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null;
+                orangeAt = DeadlineService.addMonths(c.receivedDate, 4);
+                redAt = DeadlineService.addMonths(c.receivedDate, 5);
+                break;
+              case 'filing':
+                pending = c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate != null && c.caseFiledDate == null;
+                redAt = DeadlineService.addMonths(c.receivedDate, 5);
+                break;
+              case 'deposit':
+                pending = c.awardDate != null && c.depositDate == null && c.executionDepositDate == null;
+                if (c.awardDate != null) { orangeAt = DeadlineService.addMonths(c.awardDate!, 3); redAt = DeadlineService.addMonthsAndDays(c.awardDate!, 3, 15); }
+                break;
+              case 'fees':
+                pending = c.depositDate != null && c.feesReceivedDate == null;
+                if (c.depositDate != null) redAt = c.depositDate!.add(const Duration(days: 7));
+                break;
+              case 'ep':
+                pending = c.awardDate != null && c.depositDate == null && c.executionDepositDate == null && c.epFiledDate == null && !now.isBefore(DeadlineService.addMonths(c.awardDate!, 4));
+                if (c.awardDate != null) redAt = DeadlineService.addMonths(c.awardDate!, 4);
+                break;
+            }
+            if (!pending) continue;
+            if (redAt != null && !now.isBefore(redAt)) { red++; }
+            else if (orangeAt != null && !now.isBefore(orangeAt)) { orange++; }
+            else { yellow++; }
+          }
+          return {'yellow': yellow, 'orange': orange, 'red': red};
         }
+        final police = countsFor('police'), filing = countsFor('filing'), deposit = countsFor('deposit'), fees = countsFor('fees'), ep = countsFor('ep');
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -83,15 +113,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text('Pending Work', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 16),
             Card(clipBehavior: Clip.antiAlias, child: Column(children: [
-              WorkflowTile(title: 'Police Documents', yellow: police, onTap: () => context.go('/cases?stage=police')),
+              WorkflowTile(title: 'Police Documents', yellow: police['yellow']!, orange: police['orange']!, red: police['red']!, onTap: () => context.go('/cases?stage=police')),
               const Divider(height: 1),
-              WorkflowTile(title: 'Case Filed', yellow: filing, onTap: () => context.go('/cases?stage=filing')),
+              WorkflowTile(title: 'Case Filed', yellow: filing['yellow']!, orange: filing['orange']!, red: filing['red']!, onTap: () => context.go('/cases?stage=filing')),
               const Divider(height: 1),
-              WorkflowTile(title: 'Deposit', yellow: deposit, onTap: () => context.go('/cases?stage=deposit')),
+              WorkflowTile(title: 'Deposit', yellow: deposit['yellow']!, orange: deposit['orange']!, red: deposit['red']!, onTap: () => context.go('/cases?stage=deposit')),
               const Divider(height: 1),
-              WorkflowTile(title: 'Fees Received', yellow: fees, onTap: () => context.go('/cases?stage=fees')),
+              WorkflowTile(title: 'Fees Received', yellow: fees['yellow']!, orange: fees['orange']!, red: fees['red']!, onTap: () => context.go('/cases?stage=fees')),
               const Divider(height: 1),
-              WorkflowTile(title: 'EP Filing', red: ep, onTap: () => context.go('/cases?stage=ep')),
+              WorkflowTile(title: 'EP Filing', yellow: ep['yellow']!, orange: ep['orange']!, red: ep['red']!, onTap: () => context.go('/cases?stage=ep')),
             ])),
             const SizedBox(height: 12),
             TextButton.icon(onPressed: () => context.go('/cases?view=all'), icon: const Icon(Icons.arrow_forward), label: const Text('View all cases')),

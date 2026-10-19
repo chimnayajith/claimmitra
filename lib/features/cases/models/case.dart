@@ -12,6 +12,9 @@ class CaseRecord {
   final DateTime? caseFiledDate;
   final DateTime? evidenceDate;
   final DateTime? awardDate;
+  final String? awardType;
+  final double? awardAmount;
+  final double? awardAmountInterestCost;
   final DateTime? depositDate;
   final double? depositAmount;
   final DateTime? feesReceivedDate;
@@ -36,6 +39,9 @@ class CaseRecord {
     this.caseFiledDate,
     this.evidenceDate,
     this.awardDate,
+    this.awardType,
+    this.awardAmount,
+    this.awardAmountInterestCost,
     this.depositDate,
     this.depositAmount,
     this.feesReceivedDate,
@@ -59,7 +65,9 @@ class CaseRecord {
     'police_station': policeStation, 'responsible_party': responsibleParty,
     'police_documents_date': _date(policeDocumentsDate),
     'case_filed_date': _date(caseFiledDate), 'evidence_date': _date(evidenceDate),
-    'award_date': _date(awardDate), 'deposit_date': _date(depositDate),
+    'award_date': _date(awardDate), 'award_type': awardType,
+    'award_amount': awardAmount, 'award_amount_interest_cost': awardAmountInterestCost,
+    'deposit_date': _date(depositDate),
     'deposit_amount': depositAmount, 'fees_received_date': _date(feesReceivedDate),
     'fees_amount': feesAmount, 'ep_filed_date': _date(epFiledDate),
     'execution_deposit_date': _date(executionDepositDate),
@@ -81,6 +89,9 @@ class CaseRecord {
     caseFiledDate: _parseDate(m['case_filed_date']),
     evidenceDate: _parseDate(m['evidence_date']),
     awardDate: _parseDate(m['award_date']),
+    awardType: m['award_type'] as String?,
+    awardAmount: _double(m['award_amount']),
+    awardAmountInterestCost: _double(m['award_amount_interest_cost']),
     depositDate: _parseDate(m['deposit_date']),
     depositAmount: _double(m['deposit_amount']),
     feesReceivedDate: _parseDate(m['fees_received_date']),
@@ -96,13 +107,16 @@ class CaseRecord {
     String? caseNumber, DateTime? receivedDate, DateTime? accidentDate,
     String? clientName, String? address, String? phone, String? policeStation,
     String? responsibleParty, DateTime? policeDocumentsDate, DateTime? caseFiledDate,
-    DateTime? evidenceDate, DateTime? awardDate, DateTime? depositDate,
+    DateTime? evidenceDate, DateTime? awardDate, String? awardType,
+    double? awardAmount, double? awardAmountInterestCost, DateTime? depositDate,
     double? depositAmount, DateTime? feesReceivedDate, double? feesAmount,
     DateTime? epFiledDate, DateTime? executionDepositDate,
     double? executionDepositAmount, bool clearCaseNumber = false,
     bool clearAccidentDate = false, bool clearPoliceDocumentsDate = false,
     bool clearCaseFiledDate = false, bool clearEvidenceDate = false,
-    bool clearAwardDate = false, bool clearDepositDate = false,
+    bool clearAwardDate = false, bool clearAwardType = false,
+    bool clearAwardAmount = false, bool clearAwardAmountInterestCost = false,
+    bool clearDepositDate = false,
     bool clearDepositAmount = false, bool clearFeesReceivedDate = false,
     bool clearFeesAmount = false, bool clearEpFiledDate = false,
     bool clearExecutionDepositDate = false, bool clearExecutionDepositAmount = false,
@@ -117,6 +131,9 @@ class CaseRecord {
     caseFiledDate: clearCaseFiledDate ? null : (caseFiledDate ?? this.caseFiledDate),
     evidenceDate: clearEvidenceDate ? null : (evidenceDate ?? this.evidenceDate),
     awardDate: clearAwardDate ? null : (awardDate ?? this.awardDate),
+    awardType: clearAwardType ? null : (awardType ?? this.awardType),
+    awardAmount: clearAwardAmount ? null : (awardAmount ?? this.awardAmount),
+    awardAmountInterestCost: clearAwardAmountInterestCost ? null : (awardAmountInterestCost ?? this.awardAmountInterestCost),
     depositDate: clearDepositDate ? null : (depositDate ?? this.depositDate),
     depositAmount: clearDepositAmount ? null : (depositAmount ?? this.depositAmount),
     feesReceivedDate: clearFeesReceivedDate ? null : (feesReceivedDate ?? this.feesReceivedDate),

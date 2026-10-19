@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,7 +16,8 @@ class CaseDetailsScreen extends StatefulWidget {
 
 class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _number = TextEditingController();
+  final _caseYear = TextEditingController();
+  final _caseSequence = TextEditingController();
   final _received = TextEditingController();
   final _accident = TextEditingController();
   final _name = TextEditingController();
@@ -26,6 +29,11 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   final _filed = TextEditingController();
   final _evidence = TextEditingController();
   final _award = TextEditingController();
+  final _awardAmount = TextEditingController();
+  final _awardAmountInterestCost = TextEditingController();
+  String? _awardType;
+  Timer? _autosaveTimer;
+  bool _autoSaving = false;
   final _deposit = TextEditingController();
   final _depositAmount = TextEditingController();
   final _fees = TextEditingController();
@@ -50,7 +58,13 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       _record = await CaseDatabase.instance.getCase(widget.caseId);
       final c = _record;
       if (c != null) {
-        _number.text = c.caseNumber ?? '';
+        final caseParts = (c.caseNumber ?? '').split('/');
+        if (caseParts.length == 2) {
+          _caseYear.text = caseParts[0].trim();
+          _caseSequence.text = caseParts[1].trim();
+        } else if (caseParts.length == 1 && caseParts[0].trim().isNotEmpty) {
+          _caseSequence.text = caseParts[0].trim();
+        }
         _received.text = _fmt(c.receivedDate);
         _accident.text = _fmt(c.accidentDate);
         _name.text = c.clientName;
@@ -62,6 +76,9 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
         _filed.text = _fmt(c.caseFiledDate);
         _evidence.text = _fmt(c.evidenceDate);
         _award.text = _fmt(c.awardDate);
+        _awardType = c.awardType;
+        _awardAmount.text = c.awardAmount?.toString() ?? '';
+        _awardAmountInterestCost.text = c.awardAmountInterestCost?.toString() ?? '';
         _deposit.text = _fmt(c.depositDate);
         _depositAmount.text = c.depositAmount?.toString() ?? '';
         _fees.text = _fmt(c.feesReceivedDate);
@@ -79,9 +96,10 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   @override
   void dispose() {
     for (final c in [
-      _number,_received,_accident,_name,_address,_phone,_station,_responsible,
-      _police,_filed,_evidence,_award,_deposit,_depositAmount,_fees,_feesAmount,_ep,_execution,_executionAmount,
+      _caseYear,_caseSequence,_received,_accident,_name,_address,_phone,_station,_responsible,
+      _police,_filed,_evidence,_award,_awardAmount,_awardAmountInterestCost,_deposit,_depositAmount,_fees,_feesAmount,_ep,_execution,_executionAmount,
     ]) { c.dispose(); }
+    _autosaveTimer?.cancel();
     super.dispose();
   }
 
@@ -100,30 +118,140 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   String _fmt(DateTime? d) => d == null ? '' : '${d.day.toString().padLeft(2,'0')}/${d.month.toString().padLeft(2,'0')}/${d.year}';
   double? _money(String s) => s.trim().isEmpty ? null : double.tryParse(s.replaceAll(',', '').replaceAll('₹','').trim());
 
-  Future<void> _pickDate(TextEditingController controller) async {
-    final current = _parse(controller.text);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current ?? DateTime.now(),
-      firstDate: DateTime(1950),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) setState(() => controller.text = _fmt(picked));
+  DateTime _earliestFor(TextEditingController controller) {
+    DateTime? prior;
+    if (controller == _received) prior = _parse(_accident.text);
+    if (controller == _police) prior = _parse(_received.text);
+    if (controller == _filed) prior = _hasCaseNumber ? _parse(_received.text) : _parse(_police.text);
+    if (controller == _evidence) prior = _hasCaseNumber ? _parse(_received.text) : _parse(_filed.text);
+    if (controller == _award) prior = _parse(_evidence.text);
+    if (controller == _deposit) prior = _parse(_award.text);
+    if (controller == _fees) prior = _parse(_deposit.text);
+    if (controller == _ep) {
+      final award = _parse(_award.text);
+      if (award != null) prior = DeadlineService.addMonths(award, 4);
+    }
+    if (controller == _execution) prior = _parse(_ep.text);
+    return prior == null ? DateTime(1950) : DateTime(prior.year, prior.month, prior.day);
   }
 
-  Future<void> _save() async {
+  Future<void> _pickDate(TextEditingController controller) async {
+    final current = _parse(controller.text);
+    final first = _earliestFor(controller);
+    final today = DateTime.now();
+    final last = DateTime(today.year, today.month, today.day);
+    if (first.isAfter(last)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This date cannot be selected until the preceding deadline has passed.')));
+      return;
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current != null && !current.isBefore(first) && !current.isAfter(last) ? current : (first.isAfter(last) ? last : (first.isAfter(DateTime(1950)) ? first : last)),
+      firstDate: first,
+      lastDate: last,
+    );
+    if (picked != null) {
+      setState(() => controller.text = _fmt(picked));
+      _scheduleAutosave();
+    }
+  }
+
+  void _scheduleAutosave() {
+    if (_loading) return;
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted && !_saving) _save(silent: true);
+    });
+  }
+
+  Future<void> _save({bool silent = false}) async {
     if (!_formKey.currentState!.validate()) return;
+    final accidentDateForValidation = _parse(_accident.text);
+    final dates = <String, DateTime?>{
+      'Case Received Date': _parse(_received.text),
+      'Date of Accident': accidentDateForValidation,
+      'Police Documents Date': _parse(_police.text),
+      'Case Filed Date': _parse(_filed.text),
+      'Evidence Date': _parse(_evidence.text),
+      'Award Date': _parse(_award.text),
+      'Deposit Date': _parse(_deposit.text),
+      'Fees Received Date': _parse(_fees.text),
+      'EP Filed Date': _parse(_ep.text),
+      'Deposit Against Execution Date': _parse(_execution.text),
+    };
+    final today = DateTime.now();
+    for (final entry in dates.entries) {
+      final date = entry.value;
+      if (date != null && date.isAfter(DateTime(today.year, today.month, today.day))) {
+        if (!silent) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${entry.key} cannot be in the future.')));
+        return;
+      }
+    }
+    final accidentDate = _parse(_accident.text);
+    if (accidentDate != null && dates['Case Received Date'] != null && accidentDate.isAfter(dates['Case Received Date']!)) {
+      if (!silent) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Date of Accident cannot be after Case Received Date.')));
+      return;
+    }
+    final receivedDate = dates['Case Received Date'];
+    final policeDate = dates['Police Documents Date'];
+    final filedDate = dates['Case Filed Date'];
+    final evidenceDate = dates['Evidence Date'];
+    final awardDate = dates['Award Date'];
+    final depositDate = dates['Deposit Date'];
+    final feesDate = dates['Fees Received Date'];
+    final epDate = dates['EP Filed Date'];
+    final executionDate = dates['Deposit Against Execution Date'];
+    final timeline = <(String, DateTime?, String, DateTime?)>[
+      ('Date of Accident', accidentDateForValidation, 'Case Received Date', receivedDate),
+      if (!_hasCaseNumber) ('Case Received Date', receivedDate, 'Police Documents Date', policeDate),
+      if (!_hasCaseNumber) ('Police Documents Date', policeDate, 'Case Filed Date', filedDate),
+      (_hasCaseNumber ? 'Case Received Date' : 'Case Filed Date', _hasCaseNumber ? receivedDate : filedDate, 'Evidence Date', evidenceDate),
+      ('Evidence Date', evidenceDate, 'Award Date', awardDate),
+      ('Award Date', awardDate, 'Deposit Date', depositDate),
+      ('Deposit Date', depositDate, 'Fees Received Date', feesDate),
+      ('EP Filed Date', epDate, 'Deposit Against Execution Date', executionDate),
+    ];
+    for (final pair in timeline) {
+      final earlier = pair.$2;
+      final later = pair.$4;
+      if (earlier != null && later != null && later.isBefore(earlier)) {
+        if (!silent) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${pair.$3} cannot be before ${pair.$1}.')));
+        return;
+      }
+    }
+    if (epDate != null && awardDate != null && epDate.isBefore(DeadlineService.addMonths(awardDate, 4))) {
+      if (!silent) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('EP Filing Date cannot be before four months after the Award Date.')));
+      return;
+    }
+    if (epDate != null && depositDate != null) {
+      if (!silent) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('EP filing is only for cases without a normal deposit.')));
+      return;
+    }
+    if (_caseYear.text.trim().isNotEmpty != _caseSequence.text.trim().isNotEmpty) {
+      if (!silent) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter both Case Year and Case Number, or leave both blank.')));
+      return;
+    }
+    if (_caseYear.text.trim().isNotEmpty && (!RegExp(r'^\d{4}$').hasMatch(_caseYear.text.trim()) || !RegExp(r'^\d+$').hasMatch(_caseSequence.text.trim()))) {
+      if (!silent) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Case Year must be 4 digits and Case Number must be numeric.')));
+      return;
+    }
+    if (_phone.text.trim().isNotEmpty && !RegExp(r'^\d{10}$').hasMatch(_phone.text.trim())) {
+      if (!silent) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number must contain exactly 10 digits.')));
+      return;
+    }
     final received = _parse(_received.text);
     if (received == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a valid Case Received Date.')));
       return;
     }
-    setState(() => _saving = true);
+    setState(() { _saving = true; _autoSaving = silent; });
     final now = DateTime.now();
     final old = _record;
     final record = CaseRecord(
       id: old?.id ?? 'case_${now.microsecondsSinceEpoch}',
-      caseNumber: _number.text.trim().isEmpty ? null : _number.text.trim(),
+      caseNumber: _caseYear.text.trim().isEmpty && _caseSequence.text.trim().isEmpty
+          ? null
+          : '${_caseYear.text.trim()}/${_caseSequence.text.trim()}',
       receivedDate: received,
       accidentDate: _parse(_accident.text),
       clientName: _name.text.trim(),
@@ -135,6 +263,9 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       caseFiledDate: _parse(_filed.text),
       evidenceDate: _parse(_evidence.text),
       awardDate: _parse(_award.text),
+      awardType: _awardType,
+      awardAmount: _money(_awardAmount.text),
+      awardAmountInterestCost: _money(_awardAmountInterestCost.text),
       depositDate: _parse(_deposit.text),
       depositAmount: _money(_depositAmount.text),
       feesReceivedDate: _parse(_fees.text),
@@ -148,20 +279,22 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
     try {
       await CaseDatabase.instance.save(record);
       if (!mounted) return;
-      setState(() { _record = record; _saving = false; });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Case saved.')));
+      setState(() { _record = record; _saving = false; _autoSaving = false; });
+      if (!silent) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Case saved.')));
       if (_isNew) context.go('/cases/${record.id}');
     } catch (e) {
       if (mounted) {
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save case: $e')));
+        setState(() { _saving = false; _autoSaving = false; });
+        if (!silent) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save case: $e')));
       }
     }
   }
 
   bool get _detailsReady => _parse(_received.text) != null && _name.text.trim().isNotEmpty;
-  bool get _policeReady => _parse(_police.text) != null;
-  bool get _filedReady => _parse(_filed.text) != null;
+  bool get _hasCaseNumber => _caseYear.text.trim().isNotEmpty && _caseSequence.text.trim().isNotEmpty;
+  String get _combinedCaseNumber => _hasCaseNumber ? '${_caseYear.text.trim()}/${_caseSequence.text.trim()}' : ''; 
+  bool get _policeReady => _hasCaseNumber || _parse(_police.text) != null;
+  bool get _filedReady => _hasCaseNumber || _parse(_filed.text) != null;
   bool get _evidenceReady => _parse(_evidence.text) != null;
   bool get _awardReady => _parse(_award.text) != null;
   bool get _depositReady => _parse(_deposit.text) != null && _money(_depositAmount.text) != null;
@@ -198,7 +331,25 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
     final depositDeadline = award == null ? null : DeadlineService.addMonthsAndDays(award, 2, 15);
     final epDeadline = award == null ? null : DeadlineService.addMonths(award, 4);
 
-    return SingleChildScrollView(
+    return Column(children: [
+      Material(
+        elevation: 2,
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          child: Row(children: [
+            IconButton(onPressed: () => context.go('/cases'), icon: const Icon(Icons.arrow_back)),
+            const SizedBox(width: 8),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_name.text.isEmpty ? (_isNew ? 'New Case' : 'Case Details') : _name.text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleLarge),
+              Text(_combinedCaseNumber.isEmpty ? 'No case number assigned' : 'Case No. $_combinedCaseNumber', style: Theme.of(context).textTheme.bodySmall),
+            ])),
+            if (_autoSaving) const Padding(padding: EdgeInsets.only(right: 12), child: Text('Autosaving…')),
+            FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save_outlined), label: Text(_saving ? 'Saving...' : 'Save')),
+          ]),
+        ),
+      ),
+      Expanded(child: SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       child: Center(
         child: ConstrainedBox(
@@ -206,36 +357,39 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
           child: Form(
             key: _formKey,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                IconButton(onPressed: () => context.go('/cases'), icon: const Icon(Icons.arrow_back)),
-                const SizedBox(width: 8),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_name.text.isEmpty ? (_isNew ? 'New Case' : 'Case Details') : _name.text, style: Theme.of(context).textTheme.headlineLarge),
-                  const SizedBox(height: 4),
-                  Text(_number.text.isEmpty ? 'No case number assigned' : 'Case No. ${_number.text}', style: Theme.of(context).textTheme.bodyMedium),
-                ])),
-                FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save_outlined), label: Text(_saving ? 'Saving...' : 'Save Case')),
-              ]),
-              const SizedBox(height: 28),
+              const SizedBox(height: 8),
               _section(1, 'Case Details', 'Basic information and client contact details', completed: _detailsReady, child: Column(children: [
-                _row(_field(_number,'Case Number (optional)'), _date(_received,'Case Received Date', requiredField: true)),
+                _row(
+                  Row(children: [
+                    Expanded(child: _field(_caseYear, 'Case Year', numeric: true)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _field(_caseSequence, 'Case Number', numeric: true)),
+                  ]),
+                  _date(_received,'Case Received Date', requiredField: true),
+                ),
                 const SizedBox(height: 16),
                 _row(_date(_accident,'Date of Accident'), _field(_name,'Client Name', requiredField: true)),
                 const SizedBox(height: 16),
                 _field(_address,'Address', maxLines: 2),
                 const SizedBox(height: 16),
-                _row(_field(_phone,'Phone Number'), _field(_station,'Police Station')),
+                _row(_field(_phone,'Phone Number', numeric: true), _field(_station,'Police Station')),
                 const SizedBox(height: 16),
                 _field(_responsible,'Responsible Company / Person'),
               ])),
               _connector(),
-              _section(2, 'Police Documents', 'Deadline: 3 months yellow · 4 months orange · 5 months red', locked: !_detailsReady, completed: _policeReady, deadline: policeDeadline, status: received == null ? null : _dateStatus(received, _parse(_police.text), DeadlineService.addMonths(received,3), orange: DeadlineService.addMonths(received,4), red: DeadlineService.addMonths(received,5)), child: _date(_police,'Documents Received Date')),
+              _section(2, 'Police Documents', 'Deadline: 3 months yellow · 4 months orange · 5 months red', locked: !_detailsReady || _hasCaseNumber, completed: _policeReady, deadline: policeDeadline, status: received == null ? null : _dateStatus(received, _parse(_police.text), DeadlineService.addMonths(received,3), orange: DeadlineService.addMonths(received,4), red: DeadlineService.addMonths(received,5)), child: _date(_police,'Documents Received Date')),
               _connector(),
-              _section(3, 'Case Filed', 'Deadline: 4 months yellow · 5 months red', locked: !_policeReady, completed: _filedReady, deadline: filingDeadline, status: received == null ? null : _filingStatus(received, _parse(_filed.text)), child: _date(_filed,'Case Filed Date')),
+              _section(3, 'Case Filed', 'Deadline: 4 months yellow · 5 months red', locked: !_detailsReady || (!_hasCaseNumber && !_policeReady), completed: _filedReady, deadline: filingDeadline, status: received == null ? null : _filingStatus(received, _parse(_filed.text)), child: _date(_filed,'Case Filed Date')),
               _connector(),
               _section(4, 'Evidence', 'Record the evidence date', locked: !_filedReady, completed: _evidenceReady, child: _date(_evidence,'Evidence Date')),
               _connector(),
-              _section(5, 'Award / Court Decision', 'Record the court decision date', locked: !_evidenceReady, completed: _awardReady, child: _date(_award,'Award Date')),
+              _section(5, 'Award / Court Decision', 'Record the award date and amounts', locked: !_evidenceReady, completed: _awardReady, child: Column(children: [
+                DropdownButtonFormField<String>(initialValue: _awardType, decoration: const InputDecoration(labelText: 'Type of Award'), items: const [DropdownMenuItem(value: 'Settlement', child: Text('Settlement')), DropdownMenuItem(value: 'Court', child: Text('Court'))], onChanged: (value) { setState(() => _awardType = value); _scheduleAutosave(); }),
+                const SizedBox(height: 16),
+                _row(_date(_award,'Award Date'), _field(_awardAmount,'Award Amount (₹)', numeric: true)),
+                const SizedBox(height: 16),
+                _field(_awardAmountInterestCost,'Award Amount + Interest and Cost (₹)', numeric: true),
+              ])),
               _connector(),
               _section(6, 'Deposit', '2.5 months yellow · 3 months orange · 3.5 months red', locked: !_awardReady, completed: _depositReady, deadline: depositDeadline, status: award == null ? null : _dateStatus(award, deposit, DeadlineService.addMonthsAndDays(award,2,15), orange: DeadlineService.addMonths(award,3), red: DeadlineService.addMonthsAndDays(award,3,15)), child: Column(children: [
                 _row(_date(_deposit,'Deposit Date'), _field(_depositAmount,'Deposit Amount (₹)', numeric: true)),
@@ -243,7 +397,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
               _connector(),
               _section(7, 'Fees Received', 'Due within 7 days of normal deposit', locked: !_depositReady, completed: _feesReady, deadline: deposit?.add(const Duration(days:7)), child: _row(_date(_fees,'Fees Received Date'), _field(_feesAmount,'Fees Amount (₹)', numeric: true))),
               _connector(),
-              _section(8, 'EP Filing', 'Unlocks 4 months after award if normal deposit has not occurred', locked: !_awardReady || deposit != null || (award != null && DateTime.now().isBefore(DeadlineService.addMonths(award, 4))), completed: _epReady, deadline: epDeadline, child: _date(_ep,'EP Filed Date')),
+              _section(8, 'EP/RR Filing', 'Available from 4 months after award when no normal deposit has been made', locked: !_awardReady || deposit != null || (award != null && DateTime.now().isBefore(DeadlineService.addMonths(award, 4))), completed: _epReady, deadline: epDeadline, status: award == null || _epReady || deposit != null ? null : (DateTime.now().isBefore(DeadlineService.addMonths(award, 4)) ? 'Waiting' : 'Overdue'), child: _date(_ep,'EP Filed Date')),
               _connector(),
               _section(9, 'Deposit Against Execution', 'Final deposit after EP filing', locked: !_epReady, completed: _executionReady, child: _row(_date(_execution,'Deposit Against Execution Date'), _field(_executionAmount,'Amount (₹)', numeric: true))),
               const SizedBox(height: 28),
@@ -253,7 +407,8 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
           ),
         ),
       ),
-    );
+    )),
+    ]);
   }
 
   Widget _section(int n, String title, String subtitle, {required Widget child, bool locked = false, bool completed = false, DateTime? deadline, String? status}) {
@@ -275,9 +430,24 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
         const SizedBox(height: 20),
         Container(width: double.infinity,padding: const EdgeInsets.all(16),decoration: BoxDecoration(color: Colors.grey.shade50,borderRadius: BorderRadius.circular(10)),child: const Row(children: [Icon(Icons.lock_outline,size:18,color:Colors.grey),SizedBox(width:10),Expanded(child: Text('Complete the previous step to unlock this section.'))])),
       ] else ...[
-        if (dueText != null) ...[
+        if (dueText != null && !completed) ...[
           const SizedBox(height: 20),
-          Container(width: double.infinity,padding: const EdgeInsets.all(14),decoration: BoxDecoration(color: Colors.amber.withValues(alpha:.08),border: Border.all(color:Colors.amber.withValues(alpha:.3)),borderRadius:BorderRadius.circular(10)),child: Row(children: [const Icon(Icons.schedule,size:18,color:Colors.orange),const SizedBox(width:10),Expanded(child: Text('Calculated deadline: $dueText'))])),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: .08),
+              border: Border.all(
+                color: Colors.amber.withValues(alpha: .3),
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.schedule, size: 18, color: Colors.orange),
+                const SizedBox(width: 10),
+                Expanded(child: Text('Calculated deadline: $dueText')),
+              ])),
         ],
         const SizedBox(height: 20),
         child,
@@ -307,15 +477,57 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   Widget _row(Widget a, Widget b) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child:a),const SizedBox(width:16),Expanded(child:b)]);
 
   Widget _field(TextEditingController c, String label, {bool requiredField = false, bool numeric = false, int maxLines = 1}) => TextFormField(
-    controller:c, maxLines:maxLines, keyboardType:numeric ? const TextInputType.numberWithOptions(decimal:true) : TextInputType.text,
-    validator: requiredField ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null,
+    controller:c, maxLines:maxLines, keyboardType:numeric ? (label == 'Phone Number' ? TextInputType.number : const TextInputType.numberWithOptions(decimal:true)) : TextInputType.text,
+    validator: (v) {
+      if (requiredField && (v == null || v.trim().isEmpty)) return 'Required';
+      if (label == 'Phone Number' && v != null && v.trim().isNotEmpty && !RegExp(r'^\d{10}$').hasMatch(v.trim())) return 'Enter exactly 10 digits';
+      if ((label == 'Case Year' && v != null && v.trim().isNotEmpty && !RegExp(r'^\d{4}$').hasMatch(v.trim()))) return 'Enter a 4-digit year';
+      if (label == 'Case Number' && v != null && v.trim().isNotEmpty && !RegExp(r'^\d+$').hasMatch(v.trim())) return 'Enter digits only';
+      if (numeric && v != null && v.trim().isNotEmpty && _money(v) == null) return 'Enter a valid amount';
+      return null;
+    },
     decoration:InputDecoration(labelText:label),
-    onChanged: (_) => setState(() {}),
+    onChanged: (_) { setState(() {}); _scheduleAutosave(); },
   );
 
-  Widget _date(TextEditingController c, String label, {bool requiredField = false}) => TextFormField(
-    controller:c, readOnly:true, onTap:() => _pickDate(c),
-    validator: requiredField ? (v) => _parse(v ?? '') == null ? 'Select a valid date' : null : null,
-    decoration:InputDecoration(labelText:label,hintText:'Select date',suffixIcon:const Icon(Icons.calendar_today_outlined,size:19)),
-  );
+  Widget _date(
+    TextEditingController c,
+    String label, {
+    bool requiredField = false,
+  }) =>
+      TextFormField(
+        controller: c,
+        readOnly: true,
+        onTap: () => _pickDate(c),
+        validator: requiredField
+            ? (v) => _parse(v ?? '') == null
+                ? 'Select a valid date'
+                : null
+            : null,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: 'Select date',
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (c.text.isNotEmpty)
+                IconButton(
+                  tooltip: 'Clear date',
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () {
+                    setState(() {
+                      c.clear();
+                    });
+                    _scheduleAutosave();
+                  },
+                ),
+              IconButton(
+                tooltip: 'Select date',
+                icon: const Icon(Icons.calendar_today_outlined, size: 19),
+                onPressed: () => _pickDate(c),
+              ),
+            ],
+          ),
+        ),
+      );
 }

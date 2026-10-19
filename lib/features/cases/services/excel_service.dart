@@ -19,7 +19,7 @@ class ExcelService {
   static const headers = [
     'Case Number', 'Case Received Date', 'Accident Date', 'Client Name',
     'Address', 'Phone', 'Police Station', 'Responsible Company / Person',
-    'Police Documents Date', 'Case Filed Date', 'Evidence Date', 'Award Date',
+    'Police Documents Date', 'Case Filed Date', 'Evidence Date', 'Award Date', 'Award Type', 'Award Amount', 'Award Amount + Interest and Cost',
     'Deposit Date', 'Deposit Amount', 'Fees Received Date', 'Fees Amount',
     'EP Filed Date', 'Deposit Against Execution Date', 'Deposit Against Execution Amount',
   ];
@@ -42,6 +42,9 @@ class ExcelService {
         TextCellValue(_format(c.caseFiledDate)),
         TextCellValue(_format(c.evidenceDate)),
         TextCellValue(_format(c.awardDate)),
+        TextCellValue(c.awardType ?? ''),
+        TextCellValue(c.awardAmount?.toString() ?? ''),
+        TextCellValue(c.awardAmountInterestCost?.toString() ?? ''),
         TextCellValue(_format(c.depositDate)),
         TextCellValue(c.depositAmount?.toString() ?? ''),
         TextCellValue(_format(c.feesReceivedDate)),
@@ -142,6 +145,9 @@ class ExcelService {
           caseFiledDate: _parseDate(val(row, ['case filed date', 'filing date'])),
           evidenceDate: _parseDate(val(row, ['evidence date'])),
           awardDate: _parseDate(val(row, ['award date'])),
+          awardType: val(row, ['award type']).isEmpty ? null : val(row, ['award type']),
+          awardAmount: amount(val(row, ['award amount'])),
+          awardAmountInterestCost: amount(val(row, ['award amount + interest and cost', 'award amount interest and cost'])),
           depositDate: _parseDate(val(row, ['deposit date'])),
           depositAmount: amount(val(row, ['deposit amount'])),
           feesReceivedDate: _parseDate(val(row, ['fees received date', 'fees date'])),

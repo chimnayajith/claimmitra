@@ -392,49 +392,59 @@ class _CasesScreenState extends State<CasesScreen> {
                 Text(all.isEmpty ? 'Create a case or import your existing spreadsheet.' : 'Try changing the search or filter.', style: Theme.of(context).textTheme.bodyMedium),
               ]))))
             else
-              Card(clipBehavior: Clip.antiAlias, child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(
-                showCheckboxColumn: true,
-                onSelectAll: (selected) {
-                  setState(() {
-                    if (selected == true) {
-                      _selectedIds.addAll(cases.map((c) => c.id));
-                    } else {
-                      _selectedIds.removeAll(cases.map((c) => c.id));
-                    }
-                  });
-                },
-                columns: const [
-                  DataColumn(label: Text('Case No.')),
-                  DataColumn(label: Text('Client Name')),
-                  DataColumn(label: Text('Current Stage')),
-                  DataColumn(label: Text('Due')),
-                  DataColumn(label: Text('Status')),
-                  DataColumn(label: Text('Open')),
-                ],
-                rows: cases.map((c) {
-                  final status = _status(c);
-                  return DataRow(
-                    selected: _selectedIds.contains(c.id),
-                    onSelectChanged: (selected) => _toggleSelected(c.id, selected ?? false),
-                    cells: [
-                      DataCell(Text((c.caseNumber?.trim().isNotEmpty ?? false) ? c.caseNumber! : 'No case number')),
-                      DataCell(Text(c.clientName)),
-                      DataCell(Text(_stage(c))),
-                      DataCell(Text(_due(c))),
-                      DataCell(Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: _statusColor(status).withValues(alpha: .12), borderRadius: BorderRadius.circular(20)),
-                        child: Text(status, style: TextStyle(color: _statusColor(status), fontWeight: FontWeight.w600)),
-                      )),
-                      DataCell(IconButton(
-                        tooltip: 'Open case',
-                        icon: const Icon(Icons.open_in_new),
-                        onPressed: () => context.go('/cases/${c.id}'),
-                      )),
-                    ],
-                  );
-                }).toList(),
-              ))),
+              SizedBox(
+                width: double.infinity,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                        child: DataTable(
+                          showCheckboxColumn: false,
+                          onSelectAll: (selected) {
+                            setState(() {
+                              if (selected == true) {
+                                _selectedIds.addAll(cases.map((c) => c.id));
+                              } else {
+                                _selectedIds.removeAll(cases.map((c) => c.id));
+                              }
+                            });
+                          },
+                          columns: const [
+                            DataColumn(label: Text('Select')),
+                            DataColumn(label: Text('Case No.')),
+                            DataColumn(label: Text('Client Name')),
+                            DataColumn(label: Text('Current Stage')),
+                            DataColumn(label: Text('Due')),
+                            DataColumn(label: Text('Status')),
+                          ],
+                          rows: cases.map((c) {
+                            final status = _status(c);
+                            return DataRow(
+                              selected: _selectedIds.contains(c.id),
+                              onSelectChanged: (_) => context.go('/cases/${c.id}'),
+                              cells: [
+                                DataCell(Checkbox(value: _selectedIds.contains(c.id), onChanged: (selected) => _toggleSelected(c.id, selected ?? false))),
+                                DataCell(Text((c.caseNumber?.trim().isNotEmpty ?? false) ? c.caseNumber! : 'No case number')),
+                                DataCell(Text(c.clientName)),
+                                DataCell(Text(_stage(c))),
+                                DataCell(Text(_due(c))),
+                                DataCell(Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(color: _statusColor(status).withValues(alpha: .12), borderRadius: BorderRadius.circular(20)),
+                                  child: Text(status, style: TextStyle(color: _statusColor(status), fontWeight: FontWeight.w600)),
+                                )),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ]),
         );
       },

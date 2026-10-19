@@ -114,7 +114,7 @@ class CaseList extends StatelessWidget {
             CaseListRow(
               caseNumber: caseItem.caseNumber?.trim().isNotEmpty == true
                   ? caseItem.caseNumber!
-                  : 'No case number',
+                  : 'N/A',
               clientName: caseItem.clientName,
               currentStage: _stage(caseItem),
               due: _due(caseItem),
