@@ -30,7 +30,7 @@ class SidebarItem extends StatelessWidget {
           height: 46,
           decoration: BoxDecoration(
             color: selected
-                ? theme.colorScheme.primary.withOpacity(0.1)
+                ? theme.colorScheme.primary.withValues(alpha: 0.1)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
