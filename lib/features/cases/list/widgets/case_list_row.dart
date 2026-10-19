@@ -96,7 +96,7 @@ class _CaseListRowState extends State<CaseListRow> {
                     ),
                     decoration: BoxDecoration(
                       color: widget.statusColor
-                          .withValues(alpha: 0.1),
+                          .withOpacity(0.1),
                       borderRadius:
                           BorderRadius.circular(20),
                     ),

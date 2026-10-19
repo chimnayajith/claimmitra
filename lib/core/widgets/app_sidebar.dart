@@ -21,16 +21,13 @@ class AppSidebar extends StatelessWidget {
           children: [
             const SizedBox(height: 20),
 
-            const Icon(
-              Icons.balance,
-              size: 42,
-            ),
+            Image.asset('assets/branding/claimmitra.png', width: 64, height: 64),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             Text(
-              'Case Manager',
-              style: Theme.of(context).textTheme.titleLarge,
+              'ClaimMitra',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
 
             const SizedBox(height: 30),

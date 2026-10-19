@@ -45,15 +45,10 @@ class CaseList extends StatelessWidget {
   String _due(CaseRecord c) {
     DateTime? d;
     if (c.isClosed) return '—';
-    if (c.awardDate != null && c.depositDate == null) {
-      d = DateTime(c.awardDate!.year, c.awardDate!.month + 2, c.awardDate!.day + 15);
-    } else if (c.depositDate != null && c.feesReceivedDate == null) {
-      d = c.depositDate!.add(const Duration(days: 7));
-    } else if (c.policeDocumentsDate == null) {
-      d = DateTime(c.receivedDate.year, c.receivedDate.month + 3, c.receivedDate.day);
-    } else if (c.caseFiledDate == null) {
-      d = DateTime(c.receivedDate.year, c.receivedDate.month + 4, c.receivedDate.day);
-    }
+    if (c.awardDate != null && c.depositDate == null) d = DateTime(c.awardDate!.year, c.awardDate!.month + 2, c.awardDate!.day + 15);
+    else if (c.depositDate != null && c.feesReceivedDate == null) d = c.depositDate!.add(const Duration(days: 7));
+    else if (c.policeDocumentsDate == null) d = DateTime(c.receivedDate.year, c.receivedDate.month + 3, c.receivedDate.day);
+    else if (c.caseFiledDate == null) d = DateTime(c.receivedDate.year, c.receivedDate.month + 4, c.receivedDate.day);
     if (d == null) return '—';
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }

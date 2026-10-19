@@ -9,7 +9,7 @@ class CaseManagerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Case Manager',
+      title: 'ClaimMitra',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: appRouter,

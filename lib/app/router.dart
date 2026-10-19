@@ -22,7 +22,10 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/cases',
           builder: (context, state) {
-            return const CasesScreen();
+            return CasesScreen(
+              view: state.uri.queryParameters['view'],
+              stage: state.uri.queryParameters['stage'],
+            );
           },
           routes: [
             GoRoute(

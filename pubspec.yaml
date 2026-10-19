@@ -1,5 +1,5 @@
 name: claimmitra
-description: ClaimMitra desktop case management.
+description: ClaimMitra - Insurance claim case management.
 publish_to: 'none'
 version: 1.0.0+1
 environment:
@@ -20,3 +20,6 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
+  assets:
+    - assets/branding/claimmitra.png
+    - assets/branding/claimmitra_icon.png

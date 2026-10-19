@@ -85,6 +85,18 @@ class CaseDatabase {
     await db.delete('cases', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> deleteMany(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = await database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final id in ids) {
+        batch.delete('cases', where: 'id = ?', whereArgs: [id]);
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
   Future<int> count() async {
     final db = await database;
     final rows = await db.rawQuery('SELECT COUNT(*) AS total FROM cases');

@@ -241,7 +241,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
                 _row(_date(_deposit,'Deposit Date'), _field(_depositAmount,'Deposit Amount (₹)', numeric: true)),
               ])),
               _connector(),
-              _section(7, 'Fees Received', 'Due within 7 days of normal deposit', locked: !_depositReady, completed: _feesReady, deadline: deposit?.add(const Duration(days:7)), child: _row(_date(_fees,'Fees Received Date'), _field(_feesAmount,'Fees Amount (₹)', numeric: true))),
+              _section(7, 'Fees Received', 'Due within 7 days of normal deposit', locked: !_depositReady, completed: _feesReady, deadline: deposit == null ? null : deposit.add(const Duration(days:7)), child: _row(_date(_fees,'Fees Received Date'), _field(_feesAmount,'Fees Amount (₹)', numeric: true))),
               _connector(),
               _section(8, 'EP Filing', 'Unlocks 4 months after award if normal deposit has not occurred', locked: !_awardReady || deposit != null || (award != null && DateTime.now().isBefore(DeadlineService.addMonths(award, 4))), completed: _epReady, deadline: epDeadline, child: _date(_ep,'EP Filed Date')),
               _connector(),

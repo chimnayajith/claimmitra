@@ -59,42 +59,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (!c.isClosed && c.awardDate != null && c.depositDate == null && !DateTime.now().isBefore(DeadlineService.addMonths(c.awardDate!,4))) ep++;
         }
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Dashboard', style: Theme.of(context).textTheme.headlineLarge),
             const SizedBox(height: 6),
             Text("Here's what's happening today.", style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             if (snapshot.connectionState == ConnectionState.waiting) const LinearProgressIndicator(),
             LayoutBuilder(builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 1100 ? 4 : 2;
+              final columns = constraints.maxWidth >= 640 ? 4 : 2;
               return GridView.count(
-                crossAxisCount: columns, crossAxisSpacing: 20, mainAxisSpacing: 20,
-                shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), childAspectRatio: 2.2,
+                crossAxisCount: columns, crossAxisSpacing: 12, mainAxisSpacing: 12,
+                shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), childAspectRatio: 1.8,
                 children: [
-                  StatCard(title: 'Active Cases', value: '$active', icon: Icons.folder_outlined, color: Colors.blue),
-                  StatCard(title: 'Urgent', value: '$urgent', icon: Icons.warning_amber_rounded, color: Colors.red),
-                  StatCard(title: 'Due Soon', value: '$due', icon: Icons.schedule, color: Colors.orange),
-                  StatCard(title: 'Healthy', value: '$healthy', icon: Icons.check_circle_outline, color: Colors.green),
+                  StatCard(title: 'Active Cases', value: '$active', icon: Icons.folder_outlined, color: Colors.blue, onTap: () => context.go('/cases?view=active')),
+                  StatCard(title: 'Urgent', value: '$urgent', icon: Icons.warning_amber_rounded, color: Colors.red, onTap: () => context.go('/cases?view=urgent')),
+                  StatCard(title: 'Due Soon', value: '$due', icon: Icons.schedule, color: Colors.orange, onTap: () => context.go('/cases?view=dueSoon')),
+                  StatCard(title: 'Healthy', value: '$healthy', icon: Icons.check_circle_outline, color: Colors.green, onTap: () => context.go('/cases?view=healthy')),
                 ],
               );
             }),
-            const SizedBox(height: 40),
+            const SizedBox(height: 28),
             Text('Pending Work', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 16),
             Card(clipBehavior: Clip.antiAlias, child: Column(children: [
-              WorkflowTile(title: 'Police Documents', yellow: police, onTap: () => context.go('/cases')),
+              WorkflowTile(title: 'Police Documents', yellow: police, onTap: () => context.go('/cases?stage=police')),
               const Divider(height: 1),
-              WorkflowTile(title: 'Case Filed', yellow: filing, onTap: () => context.go('/cases')),
+              WorkflowTile(title: 'Case Filed', yellow: filing, onTap: () => context.go('/cases?stage=filing')),
               const Divider(height: 1),
-              WorkflowTile(title: 'Deposit', yellow: deposit, onTap: () => context.go('/cases')),
+              WorkflowTile(title: 'Deposit', yellow: deposit, onTap: () => context.go('/cases?stage=deposit')),
               const Divider(height: 1),
-              WorkflowTile(title: 'Fees Received', yellow: fees, onTap: () => context.go('/cases')),
+              WorkflowTile(title: 'Fees Received', yellow: fees, onTap: () => context.go('/cases?stage=fees')),
               const Divider(height: 1),
-              WorkflowTile(title: 'EP Filing', red: ep, onTap: () => context.go('/cases')),
+              WorkflowTile(title: 'EP Filing', red: ep, onTap: () => context.go('/cases?stage=ep')),
             ])),
             const SizedBox(height: 12),
-            TextButton.icon(onPressed: () => context.go('/cases'), icon: const Icon(Icons.arrow_forward), label: const Text('View all cases')),
+            TextButton.icon(onPressed: () => context.go('/cases?view=all'), icon: const Icon(Icons.arrow_forward), label: const Text('View all cases')),
           ]),
         );
       },

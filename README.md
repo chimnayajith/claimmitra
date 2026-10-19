@@ -1,62 +1,33 @@
 # ClaimMitra
 
-ClaimMitra is a Flutter desktop case-management application for tracking case milestones, statutory/office deadlines, deposits, fees and execution proceedings.
+ClaimMitra is a Flutter desktop application for insurance-claim case management.
 
-## Requirements
-
-- Flutter SDK compatible with Dart 3.10+
-- Linux desktop development dependencies (for Linux builds)
-- Excel files in `.xlsx` format for import/export
-
-## Run locally
-
-This source archive does not include generated platform runner folders. On your Linux development machine, generate the Linux runner once from the project root, then run the app:
+## Run on NixOS/Linux
 
 ```bash
-flutter create --platforms=linux .
-flutter config --enable-linux-desktop
+nix-shell
 flutter pub get
-flutter analyze
-flutter test
 flutter run -d linux
 ```
 
-The first run creates a local SQLite database named `claimmitra.sqlite` in the operating system's application-support directory. Records persist between launches. The database is local to the current computer; this build does not synchronize between computers.
+## Build and distribute on Windows
 
-## Excel import format
+The GitHub Actions workflow `.github/workflows/windows-release.yml` builds the Windows release and packages both:
 
-Use **Cases → Export Excel** to create an `.xlsx` workbook with the supported column headings. You can also create a spreadsheet with these columns (header matching is case-insensitive):
+- `ClaimMitra-Setup-1.0.0.exe`: a Windows installer with ClaimMitra branding and Start Menu shortcut.
+- `ClaimMitra-Portable-Windows-x64.zip`: portable app folder for testing.
 
-- Case Number (optional)
-- Case Received Date (required; `DD/MM/YYYY` or ISO date)
-- Accident Date
-- Client Name (required)
-- Address
-- Phone
-- Police Station
-- Responsible Company / Person
-- Police Documents Date
-- Case Filed Date
-- Evidence Date
-- Award Date
-- Deposit Date
-- Deposit Amount
-- Fees Received Date
-- Fees Amount
-- EP Filed Date
-- Deposit Against Execution Date
-- Deposit Against Execution Amount
+Push the project to GitHub and run **Actions → Build ClaimMitra for Windows → Run workflow**. The workflow runs `flutter analyze`, `flutter test`, and `flutter build windows --release` before packaging. If analysis or tests fail, the artifact will not be produced.
 
-Import validates rows and displays a preview before committing. Rows missing a client name or valid case received date are skipped. Existing non-empty case numbers are skipped rather than overwritten. Cases without case numbers are allowed.
+The installed application is listed as **ClaimMitra** in the Start Menu. The portable build contains the executable and supporting files; do not distribute only the executable.
 
-## Workflow notes
+## Branding assets
 
-- Police documents: 3 months yellow, 4 months orange, 5 months red from case received date.
-- Case filed: 4 months yellow, 5 months red from case received date.
-- Deposit: 2 months + 15 days yellow, 3 months orange, 3 months + 15 days red from award date.
-- EP filing is required if normal deposit has not occurred by 4 months after award.
-- Fees are expected within 7 days of deposit.
-- Evidence is one date field.
-- A normal case is treated as closed after deposit and fees are recorded. The execution branch is treated as closed after deposit against execution is recorded.
+- `assets/branding/claimmitra.png`: app logo used in the sidebar.
+- `assets/branding/claimmitra_icon.png`: square app icon source.
+- `assets/branding/claimmitra_logo.svg`: vector logo lockup.
+- `installer/claimmitra.ico`: Windows installer and executable icon.
 
-Deadlines are calculated from saved dates; status labels are not stored as authoritative database fields.
+## Data safety
+
+Back up the SQLite database before testing bulk deletion. Test the installer on a clean Windows account or PC before shipping it to a customer.
