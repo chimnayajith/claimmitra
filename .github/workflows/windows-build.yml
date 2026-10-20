@@ -1,9 +1,10 @@
+
 name: Build ClaimMitra for Windows
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
 
 permissions:
   contents: read
@@ -11,8 +12,9 @@ permissions:
 jobs:
   windows-release:
     runs-on: windows-latest
+
     steps:
-      - name: Check out source
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Flutter
@@ -21,34 +23,81 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Windows desktop platform files
+      - name: Generate Windows desktop runner
         run: flutter create --platforms=windows .
+
+      - name: Apply ClaimMitra branding
+        shell: pwsh
+        run: |
+          $cmake = 'windows/CMakeLists.txt'
+          (Get-Content $cmake -Raw).Replace(
+            'set(BINARY_NAME "claimmitra")',
+            'set(BINARY_NAME "ClaimMitra")'
+          ) | Set-Content $cmake
+
+          New-Item -ItemType Directory -Force `
+            -Path 'windows/runner/resources' | Out-Null
+
+          Copy-Item 'installer/claimmitra.ico' `
+            'windows/runner/resources/app_icon.ico' -Force
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze Dart code
+      - name: Analyze
         run: flutter analyze
 
-      - name: Run tests
+      - name: Test
         run: flutter test
 
       - name: Build Windows release
         run: flutter build windows --release
 
-      - name: Package distributable folder
+      - name: Verify build output
         shell: pwsh
         run: |
-          $release = "build/windows/x64/runner/Release"
+          $release = 'build/windows/x64/runner/Release'
           if (!(Test-Path "$release/claimmitra.exe")) {
-            throw "Expected executable not found at $release/claimmitra.exe"
+            throw 'claimmitra.exe missing from build output'
           }
-          Compress-Archive -Path "$release/*" -DestinationPath "ClaimMitra-Windows-x64.zip" -Force
+          if (!(Test-Path "$release/flutter_windows.dll")) {
+            throw 'flutter_windows.dll missing from build output'
+          }
 
-      - name: Upload Windows build artifact
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            'installer/ClaimMitra.iss'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Installer compilation failed'
+          }
+
+      - name: Verify installer
+        shell: pwsh
+        run: |
+          $installer = 'dist/ClaimMitra-Setup-1.0.0.exe'
+          if (!(Test-Path $installer)) {
+            throw "Installer not found: $installer"
+          }
+
+      - name: Package portable build
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path 'build/windows/x64/runner/Release/*' `
+            -DestinationPath 'ClaimMitra-Portable-Windows-x64.zip' `
+            -Force
+
+      - name: Upload Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: ClaimMitra-Windows-x64
-          path: ClaimMitra-Windows-x64.zip
+          name: ClaimMitra-Windows-Release
+          path: |
+            dist/ClaimMitra-Setup-1.0.0.exe
+            ClaimMitra-Portable-Windows-x64.zip
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
