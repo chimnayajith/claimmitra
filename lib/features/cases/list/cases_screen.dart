@@ -263,7 +263,12 @@ class _CasesScreenState extends State<CasesScreen> {
       debugPrint('Excel import failed: $e');
       debugPrintStack(stackTrace: stackTrace);
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Import failed: $e')));
+      if (mounted) {
+        final message = e is FormatException
+            ? e.message
+            : 'Import failed. Please verify that the file is a valid .xlsx workbook.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
 
     }
   }
