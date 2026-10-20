@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../database/case_database.dart';
@@ -54,6 +55,33 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   }
 
   Future<void> _load() async {
+    for (final controller in [
+      _caseYear,
+      _caseSequence,
+      _received,
+      _accident,
+      _name,
+      _address,
+      _phone,
+      _station,
+      _responsible,
+      _police,
+      _filed,
+      _evidence,
+      _award,
+      _awardAmount,
+      _awardAmountInterestCost,
+      _deposit,
+      _depositAmount,
+      _fees,
+      _feesAmount,
+      _ep,
+      _execution,
+      _executionAmount,
+    ]) {
+      controller.clear();
+    }
+    _awardType = null;
     if (!_isNew) {
       _record = await CaseDatabase.instance.getCase(widget.caseId);
       final c = _record;
@@ -91,6 +119,13 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       _received.text = _fmt(DateTime.now());
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _reload() async {
+    if (_saving) return;
+    _autosaveTimer?.cancel();
+    if (mounted) setState(() => _loading = true);
+    await _load();
   }
 
   @override
@@ -281,11 +316,16 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       if (!mounted) return;
       setState(() { _record = record; _saving = false; _autoSaving = false; });
       if (!silent) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Case saved.')));
-      if (_isNew) context.go('/cases/${record.id}');
+      if (_isNew) context.pop(record.id);
     } catch (e) {
       if (mounted) {
         setState(() { _saving = false; _autoSaving = false; });
-        if (!silent) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save case: $e')));
+        if (!silent) {
+          final message = e is DuplicateCaseNumberException
+              ? e.toString()
+              : 'Could not save case: $e';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        }
       }
     }
   }
@@ -331,14 +371,24 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
     final depositDeadline = award == null ? null : DeadlineService.addMonthsAndDays(award, 2, 15);
     final epDeadline = award == null ? null : DeadlineService.addMonths(award, 4);
 
-    return Column(children: [
+    return CallbackShortcuts(
+      bindings: {
+        SingleActivator(LogicalKeyboardKey.keyS, control: true): _save,
+        SingleActivator(LogicalKeyboardKey.keyS, meta: true): _save,
+        SingleActivator(LogicalKeyboardKey.keyR, control: true): _reload,
+        SingleActivator(LogicalKeyboardKey.keyR, meta: true): _reload,
+        const SingleActivator(LogicalKeyboardKey.escape): _goBack,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Column(children: [
       Material(
         elevation: 2,
         color: Theme.of(context).scaffoldBackgroundColor,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           child: Row(children: [
-            IconButton(onPressed: () => context.go('/cases'), icon: const Icon(Icons.arrow_back)),
+            IconButton(onPressed: () => context.pop(), icon: const Icon(Icons.arrow_back)),
             const SizedBox(width: 8),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_name.text.isEmpty ? (_isNew ? 'New Case' : 'Case Details') : _name.text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleLarge),
@@ -408,8 +458,12 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
         ),
       ),
     )),
-    ]);
+        ]),
+      ),
+    );
   }
+
+  void _goBack() => context.pop();
 
   Widget _section(int n, String title, String subtitle, {required Widget child, bool locked = false, bool completed = false, DateTime? deadline, String? status}) {
     final color = completed ? Colors.green : locked ? Colors.blueGrey : Theme.of(context).colorScheme.primary;

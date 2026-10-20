@@ -55,7 +55,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           LICENSE_PUBLIC_KEY_B64: ${{ secrets.LICENSE_PUBLIC_KEY_B64 }}
-          APP_VERSION: 1.0.3
+          APP_VERSION: 1.0.4
         run: |
           if (!$env:SUPABASE_URL -or !$env:SUPABASE_ANON_KEY -or !$env:LICENSE_PUBLIC_KEY_B64) {
             throw 'Missing licensing build secrets'
@@ -93,7 +93,7 @@ jobs:
       - name: Verify installer
         shell: pwsh
         run: |
-          $installer = 'dist/ClaimMitra-Setup-1.0.3.exe'
+          $installer = 'dist/ClaimMitra-Setup-1.0.4.exe'
           if (!(Test-Path $installer)) {
             throw "Installer not found: $installer"
           }
@@ -102,6 +102,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ClaimMitra-Windows-Installer
-          path: dist/ClaimMitra-Setup-1.0.3.exe
+          path: dist/ClaimMitra-Setup-1.0.4.exe
           if-no-files-found: error
           retention-days: 30

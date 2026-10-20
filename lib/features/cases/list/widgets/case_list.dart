@@ -120,8 +120,8 @@ class CaseList extends StatelessWidget {
               due: _due(caseItem),
               status: _status(caseItem),
               statusColor: _statusColor(_status(caseItem)),
-              onTap: () {
-                context.go('/cases/${caseItem.id}');
+              onTap: () async {
+                await context.push('/cases/${caseItem.id}');
               },
             ),
         ],

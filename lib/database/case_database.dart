@@ -4,6 +4,14 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../features/cases/models/case.dart';
 
+class DuplicateCaseNumberException implements Exception {
+  final String caseNumber;
+  const DuplicateCaseNumberException(this.caseNumber);
+
+  @override
+  String toString() => 'Case number $caseNumber already exists.';
+}
+
 class CaseDatabase {
   CaseDatabase._();
   static final CaseDatabase instance = CaseDatabase._();
@@ -76,18 +84,51 @@ class CaseDatabase {
 
   Future<void> save(CaseRecord record) async {
     final db = await database;
+    await _ensureCaseNumberAvailable(db, record);
     await db.insert('cases', record.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> saveMany(List<CaseRecord> records) async {
     final db = await database;
     await db.transaction((txn) async {
+      final usedNumbers = <String, String>{};
+      final existing = await txn.query('cases', columns: ['id', 'case_number']);
+      for (final row in existing) {
+        final number = _normalizeCaseNumber(row['case_number'] as String?);
+        if (number != null) usedNumbers[number] = row['id'] as String;
+      }
       final batch = txn.batch();
       for (final record in records) {
+        final number = _normalizeCaseNumber(record.caseNumber);
+        if (number != null) {
+          final existingId = usedNumbers[number];
+          if (existingId != null && existingId != record.id) {
+            throw DuplicateCaseNumberException(record.caseNumber!.trim());
+          }
+          usedNumbers[number] = record.id;
+        }
         batch.insert('cases', record.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
       }
       await batch.commit(noResult: true);
     });
+  }
+
+  Future<void> _ensureCaseNumberAvailable(Database db, CaseRecord record) async {
+    final number = _normalizeCaseNumber(record.caseNumber);
+    if (number == null) return;
+    final rows = await db.query('cases', columns: ['id', 'case_number']);
+    for (final row in rows) {
+      final existingNumber = _normalizeCaseNumber(row['case_number'] as String?);
+      if (existingNumber == number && row['id'] != record.id) {
+        throw DuplicateCaseNumberException(record.caseNumber!.trim());
+      }
+    }
+  }
+
+  static String? _normalizeCaseNumber(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return trimmed.replaceAll(RegExp(r'\s+'), '').toLowerCase();
   }
 
   Future<void> delete(String id) async {

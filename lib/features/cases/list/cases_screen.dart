@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../database/case_database.dart';
@@ -289,9 +290,15 @@ class _CasesScreenState extends State<CasesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<CaseRecord>>(
-      future: _future,
-      builder: (context, snapshot) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () => context.go('/'),
+      },
+      child: Focus(
+        autofocus: true,
+        child: FutureBuilder<List<CaseRecord>>(
+          future: _future,
+          builder: (context, snapshot) {
         final all = snapshot.data ?? <CaseRecord>[];
         final q = _query.trim().toLowerCase();
         final cases = all.where((c) {
@@ -429,7 +436,10 @@ class _CasesScreenState extends State<CasesScreen> {
                             final status = _status(c);
                             return DataRow(
                               selected: _selectedIds.contains(c.id),
-                              onSelectChanged: (_) => context.go('/cases/${c.id}'),
+                              onSelectChanged: (_) async {
+                                await context.push('/cases/${c.id}');
+                                if (mounted) _refresh();
+                              },
                               cells: [
                                 DataCell(Checkbox(value: _selectedIds.contains(c.id), onChanged: (selected) => _toggleSelected(c.id, selected ?? false))),
                                 DataCell(Text((c.caseNumber?.trim().isNotEmpty ?? false) ? c.caseNumber! : 'No case number')),
@@ -452,7 +462,9 @@ class _CasesScreenState extends State<CasesScreen> {
               ),
           ]),
         );
-      },
+          },
+        ),
+      ),
     );
   }
 }
