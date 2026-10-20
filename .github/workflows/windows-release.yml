@@ -97,7 +97,7 @@ jobs:
         with:
           name: ClaimMitra-Windows-Release
           path: |
-            installer/output/ClaimMitra-Setup-1.0.0.exe
+            dist/ClaimMitra-Setup-1.0.0.exe
             ClaimMitra-Portable-Windows-x64.zip
           if-no-files-found: error
           retention-days: 30
