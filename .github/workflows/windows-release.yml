@@ -1,3 +1,4 @@
+
 name: Build ClaimMitra for Windows
 
 on:
@@ -12,6 +13,7 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,13 +31,24 @@ jobs:
         shell: pwsh
         run: |
           $cmake = 'windows/CMakeLists.txt'
-          (Get-Content $cmake -Raw).Replace('set(BINARY_NAME "claimmitra")', 'set(BINARY_NAME "ClaimMitra")') | Set-Content $cmake
-          New-Item -ItemType Directory -Force -Path 'windows/runner/resources' | Out-Null
-          Copy-Item 'installer/claimmitra.ico' 'windows/runner/resources/app_icon.ico' -Force
+          (Get-Content $cmake -Raw).Replace(
+            'set(BINARY_NAME "claimmitra")',
+            'set(BINARY_NAME "ClaimMitra")'
+          ) | Set-Content $cmake
+
+          New-Item -ItemType Directory -Force `
+            -Path 'windows/runner/resources' | Out-Null
+
+          Copy-Item 'installer/claimmitra.ico' `
+            'windows/runner/resources/app_icon.ico' -Force
+
           $mainCpp = 'windows/runner/main.cpp'
           if (Test-Path $mainCpp) {
-            (Get-Content $mainCpp -Raw).Replace('L"claimmitra"', 'L"ClaimMitra"') | Set-Content $mainCpp
+            (Get-Content $mainCpp -Raw).Replace(
+              'L"claimmitra"', 'L"ClaimMitra"'
+            ) | Set-Content $mainCpp
           }
+
           $rc = 'windows/runner/Runner.rc'
           if (Test-Path $rc) {
             $content = Get-Content $rc -Raw
@@ -55,22 +68,29 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build release
+      - name: Build Windows release
         run: flutter build windows --release
 
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
 
-      - name: Build installer
+      - name: Build ClaimMitra installer
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path 'installer/output' | Out-Null
-          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' 'installer/ClaimMitra.iss'
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "installer\ClaimMitra.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed"
+          }
 
       - name: Package portable build
         shell: pwsh
-        run: Compress-Archive -Path 'build/windows/x64/runner/Release/*' -DestinationPath 'ClaimMitra-Portable-Windows-x64.zip' -Force
+        run: |
+          Compress-Archive `
+            -Path 'build/windows/x64/runner/Release/*' `
+            -DestinationPath 'ClaimMitra-Portable-Windows-x64.zip' `
+            -Force
 
       - name: Upload Windows releases
         uses: actions/upload-artifact@v4
