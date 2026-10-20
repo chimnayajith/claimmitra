@@ -4,6 +4,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'app/app.dart';
 import 'database/backup_service.dart';
 import 'database/case_database.dart';
+import 'licensing/activation_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,5 +21,5 @@ Future<void> main() async {
     debugPrintStack(stackTrace: stackTrace);
   }
 
-  runApp(const CaseManagerApp());
+  runApp(const LicenseGate(child: CaseManagerApp()));
 }

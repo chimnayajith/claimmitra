@@ -1,22 +1,27 @@
-
-name: Build ClaimMitra for Windows
+name: Build and publish ClaimMitra Windows release
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Use a tag like v1.2.3" }
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -31,24 +36,11 @@ jobs:
         shell: pwsh
         run: |
           $cmake = 'windows/CMakeLists.txt'
-          (Get-Content $cmake -Raw).Replace(
-            'set(BINARY_NAME "claimmitra")',
-            'set(BINARY_NAME "ClaimMitra")'
-          ) | Set-Content $cmake
-
-          New-Item -ItemType Directory -Force `
-            -Path 'windows/runner/resources' | Out-Null
-
-          Copy-Item 'installer/claimmitra.ico' `
-            'windows/runner/resources/app_icon.ico' -Force
-
+          (Get-Content $cmake -Raw).Replace('set(BINARY_NAME "claimmitra")', 'set(BINARY_NAME "ClaimMitra")') | Set-Content $cmake
+          New-Item -ItemType Directory -Force -Path 'windows/runner/resources' | Out-Null
+          Copy-Item 'installer/claimmitra.ico' 'windows/runner/resources/app_icon.ico' -Force
           $mainCpp = 'windows/runner/main.cpp'
-          if (Test-Path $mainCpp) {
-            (Get-Content $mainCpp -Raw).Replace(
-              'L"claimmitra"', 'L"ClaimMitra"'
-            ) | Set-Content $mainCpp
-          }
-
+          if (Test-Path $mainCpp) { (Get-Content $mainCpp -Raw).Replace('L"claimmitra"', 'L"ClaimMitra"') | Set-Content $mainCpp }
           $rc = 'windows/runner/Runner.rc'
           if (Test-Path $rc) {
             $content = Get-Content $rc -Raw
@@ -58,6 +50,8 @@ jobs:
             $content = $content -replace 'VALUE "OriginalFilename", ".*"', 'VALUE "OriginalFilename", "ClaimMitra.exe"'
             Set-Content $rc $content
           }
+          $iss = 'installer/ClaimMitra.iss'
+          (Get-Content $iss -Raw) -replace '#define MyAppVersion ".*"', '#define MyAppVersion "${{ steps.version.outputs.version }}"' | Set-Content $iss
 
       - name: Install dependencies
         run: flutter pub get
@@ -68,36 +62,36 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build Windows release
-        run: flutter build windows --release
+      - name: Build release
+        shell: pwsh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          LICENSE_PUBLIC_KEY_B64: ${{ secrets.LICENSE_PUBLIC_KEY_B64 }}
+          APP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if (!$env:SUPABASE_URL -or !$env:SUPABASE_ANON_KEY -or !$env:LICENSE_PUBLIC_KEY_B64) { throw 'Configure SUPABASE_URL, SUPABASE_ANON_KEY, and LICENSE_PUBLIC_KEY_B64 repository secrets.' }
+          flutter build windows --release --dart-define="SUPABASE_URL=$env:SUPABASE_URL" --dart-define="SUPABASE_ANON_KEY=$env:SUPABASE_ANON_KEY" --dart-define="LICENSE_PUBLIC_KEY_B64=$env:LICENSE_PUBLIC_KEY_B64" --dart-define="APP_VERSION=$env:APP_VERSION"
 
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
 
-      - name: Build ClaimMitra installer
+      - name: Build installer
         shell: pwsh
         run: |
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
-            "installer\ClaimMitra.iss"
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "Inno Setup compilation failed"
-          }
+          New-Item -ItemType Directory -Force -Path 'dist' | Out-Null
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' 'installer/ClaimMitra.iss'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package portable build
         shell: pwsh
-        run: |
-          Compress-Archive `
-            -Path 'build/windows/x64/runner/Release/*' `
-            -DestinationPath 'ClaimMitra-Portable-Windows-x64.zip' `
-            -Force
+        run: Compress-Archive -Path 'build/windows/x64/runner/Release/*' -DestinationPath "ClaimMitra-Portable-Windows-x64.zip" -Force
 
-      - name: Upload Windows releases
-        uses: actions/upload-artifact@v4
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: ClaimMitra-Windows-Release
-          path: |
-            dist/ClaimMitra-Setup-1.0.0.exe
+          name: ClaimMitra ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/ClaimMitra-Setup-${{ steps.version.outputs.version }}.exe
             ClaimMitra-Portable-Windows-x64.zip
-          if-no-files-found: error
-          retention-days: 30

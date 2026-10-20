@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'router.dart';
 import 'theme.dart';
+import '../licensing/update_prompt.dart';
 
 class CaseManagerApp extends StatelessWidget {
   const CaseManagerApp({super.key});
@@ -13,6 +14,7 @@ class CaseManagerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: appRouter,
+      builder: (context, child) => UpdatePrompt(child: child ?? const SizedBox.shrink()),
     );
   }
 }
