@@ -1,6 +1,6 @@
 
 #define MyAppName "ClaimMitra"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "ClaimMitra"
 #define MyAppExeName "ClaimMitra.exe"
 

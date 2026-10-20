@@ -377,7 +377,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
                 _field(_responsible,'Responsible Company / Person'),
               ])),
               _connector(),
-              _section(2, 'Police Documents', 'Deadline: 3 months yellow · 4 months orange · 5 months red', locked: !_detailsReady || _hasCaseNumber, completed: _policeReady, deadline: policeDeadline, status: received == null ? null : _dateStatus(received, _parse(_police.text), DeadlineService.addMonths(received,3), orange: DeadlineService.addMonths(received,4), red: DeadlineService.addMonths(received,5)), child: _date(_police,'Documents Received Date')),
+              _section(2, _hasCaseNumber ? 'Police Documents (Skipped)' : 'Police Documents', _hasCaseNumber ? 'Case number already assigned; continue with case filing and evidence' : 'Deadline: 3 months yellow · 4 months orange · 5 months red', locked: !_detailsReady, completed: _policeReady, deadline: policeDeadline, status: received == null ? null : _dateStatus(received, _parse(_police.text), DeadlineService.addMonths(received,3), orange: DeadlineService.addMonths(received,4), red: DeadlineService.addMonths(received,5)), child: _hasCaseNumber ? const SizedBox.shrink() : _date(_police,'Documents Received Date')),
               _connector(),
               _section(3, 'Case Filed', 'Deadline: 4 months yellow · 5 months red', locked: !_detailsReady || (!_hasCaseNumber && !_policeReady), completed: _filedReady, deadline: filingDeadline, status: received == null ? null : _filingStatus(received, _parse(_filed.text)), child: _date(_filed,'Case Filed Date')),
               _connector(),

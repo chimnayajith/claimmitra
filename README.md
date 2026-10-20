@@ -14,7 +14,7 @@ flutter run -d linux
 
 The GitHub Actions workflow `.github/workflows/windows-release.yml` builds the Windows release and packages both:
 
-- `ClaimMitra-Setup-1.0.1.exe`: a Windows installer with ClaimMitra branding and Start Menu shortcut.
+- `ClaimMitra-Setup-1.0.3.exe`: a Windows installer with ClaimMitra branding and Start Menu shortcut.
 - `ClaimMitra-Portable-Windows-x64.zip`: portable app folder for testing.
 
 Push the project to GitHub and run **Actions → Build ClaimMitra for Windows → Run workflow**. The workflow runs `flutter analyze`, `flutter test`, and `flutter build windows --release` before packaging. If analysis or tests fail, the artifact will not be produced.

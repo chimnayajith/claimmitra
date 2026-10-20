@@ -84,11 +84,11 @@ class _CasesScreenState extends State<CasesScreen> {
   DateTime? _deadlineFor(CaseRecord c) {
     switch (widget.stage) {
       case 'police':
-        return c.policeDocumentsDate == null
+        return c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null
             ? DeadlineService.addMonths(c.receivedDate, 5)
             : null;
       case 'filing':
-        return c.caseFiledDate == null && c.policeDocumentsDate != null
+        return c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null && c.policeDocumentsDate != null
             ? DeadlineService.addMonths(c.receivedDate, 5)
             : null;
       case 'deposit':
@@ -110,8 +110,12 @@ class _CasesScreenState extends State<CasesScreen> {
         if (c.depositDate != null && c.feesReceivedDate == null) {
           return c.depositDate!.add(const Duration(days: 7));
         }
-        if (c.policeDocumentsDate == null) return DeadlineService.addMonths(c.receivedDate, 5);
-        if (c.caseFiledDate == null) return DeadlineService.addMonths(c.receivedDate, 5);
+        if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
+          return DeadlineService.addMonths(c.receivedDate, 5);
+        }
+        if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
+          return DeadlineService.addMonths(c.receivedDate, 5);
+        }
         return null;
     }
   }
@@ -137,8 +141,8 @@ class _CasesScreenState extends State<CasesScreen> {
     if (widget.stage != null) {
       if (c.isClosed) return false;
       switch (widget.stage) {
-        case 'police': return c.policeDocumentsDate == null;
-        case 'filing': return c.caseFiledDate == null && c.policeDocumentsDate != null;
+        case 'police': return c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null;
+        case 'filing': return c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null && c.policeDocumentsDate != null;
         case 'deposit': return c.awardDate != null && c.depositDate == null && c.executionDepositDate == null;
         case 'fees': return c.depositDate != null && c.feesReceivedDate == null && c.executionDepositDate == null;
         case 'ep':
@@ -163,7 +167,7 @@ class _CasesScreenState extends State<CasesScreen> {
     if (c.depositDate != null) return 'Fees Received';
     if (c.awardDate != null) return 'Deposit';
     if (c.evidenceDate != null) return 'Award';
-    if (c.caseFiledDate != null) return 'Evidence';
+    if (c.caseFiledDate != null || c.caseNumber?.trim().isNotEmpty == true) return 'Evidence';
     if (c.policeDocumentsDate != null) return 'Case Filed';
     return 'Police Documents';
   }
@@ -183,11 +187,11 @@ class _CasesScreenState extends State<CasesScreen> {
       return 'Due Soon';
     }
     final start = c.receivedDate;
-    if (c.policeDocumentsDate == null) {
+    if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
       if (!now.isBefore(DeadlineService.addMonths(start, 5))) return 'Overdue';
       if (!now.isBefore(DeadlineService.addMonths(start, 3))) return 'Due Soon';
     }
-    if (c.caseFiledDate == null) {
+    if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
       if (!now.isBefore(DeadlineService.addMonths(start, 5))) return 'Overdue';
       if (!now.isBefore(DeadlineService.addMonths(start, 4))) return 'Due Soon';
     }
@@ -208,9 +212,9 @@ class _CasesScreenState extends State<CasesScreen> {
       d = DeadlineService.addMonthsAndDays(c.awardDate!, 2, 15);
     } else if (c.depositDate != null && c.feesReceivedDate == null) {
       d = c.depositDate!.add(const Duration(days: 7));
-    } else if (c.policeDocumentsDate == null) {
+        } else if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
       d = DeadlineService.addMonths(c.receivedDate, 3);
-    } else if (c.caseFiledDate == null) {
+        } else if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
       d = DeadlineService.addMonths(c.receivedDate, 4);
     }
     if (d == null) return '—';

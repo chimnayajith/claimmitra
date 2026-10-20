@@ -29,11 +29,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!now.isBefore(c.depositDate!.add(const Duration(days:7)))) return 'Overdue';
       return 'Due Soon';
     }
-    if (c.policeDocumentsDate == null) {
+    if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
       if (!now.isBefore(DeadlineService.addMonths(c.receivedDate,5))) return 'Overdue';
       if (!now.isBefore(DeadlineService.addMonths(c.receivedDate,3))) return 'Due Soon';
     }
-    if (c.caseFiledDate == null) {
+    if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
       if (!now.isBefore(DeadlineService.addMonths(c.receivedDate,5))) return 'Overdue';
       if (!now.isBefore(DeadlineService.addMonths(c.receivedDate,4))) return 'Due Soon';
     }

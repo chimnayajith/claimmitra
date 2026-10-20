@@ -64,13 +64,10 @@ The functions use Supabase's server-side service-role key through the Edge Funct
 
 In GitHub repository **Settings → Secrets and variables → Actions**, add:
 
-- `SUPABASE_URL`: your project URL
-- `SUPABASE_ANON_KEY`: your full publishable key (or legacy anon key)
-- `LICENSE_PUBLIC_KEY_B64`: contents of `~/.config/claimmitra-licensing/public_raw.b64`
 
 Do not add `LICENSE_PRIVATE_KEY_PKCS8_B64`, `LICENSE_ADMIN_SECRET`, or `SUPABASE_SERVICE_ROLE_KEY` as Flutter build arguments.
 
-The release workflow is triggered by version tags such as `v1.0.1`. It builds the Windows installer and publishes it to GitHub Releases. Check the workflow output and release assets before distributing.
+The release workflow is triggered by version tags such as `v1.0.3`. It builds the Windows installer and publishes it to GitHub Releases. Check the workflow output and release assets before distributing.
 
 ## 5. Issue a customer licence
 

@@ -20,9 +20,9 @@ class CaseList extends StatelessWidget {
     if (c.depositDate != null) return 'Fees Received';
     if (c.awardDate != null) return 'Deposit';
     if (c.evidenceDate != null) return 'Award';
-    if (c.caseFiledDate != null) return 'Evidence';
+    if (c.caseFiledDate != null || c.caseNumber?.trim().isNotEmpty == true) return 'Evidence';
     if (c.policeDocumentsDate != null) return 'Case Filed';
-    return 'Police Documents';
+    return c.caseNumber?.trim().isNotEmpty == true ? 'Evidence' : 'Police Documents';
   }
 
   String _status(CaseRecord c) {
@@ -30,8 +30,8 @@ class CaseList extends StatelessWidget {
     final now = DateTime.now();
     if (c.awardDate != null && c.depositDate == null && !now.isBefore(DateTime(c.awardDate!.year, c.awardDate!.month + 4, c.awardDate!.day))) return 'Overdue';
     if (c.depositDate != null && c.feesReceivedDate == null) return 'Due Soon';
-    if (c.policeDocumentsDate == null && !now.isBefore(DateTime(c.receivedDate.year, c.receivedDate.month + 5, c.receivedDate.day))) return 'Overdue';
-    if (c.caseFiledDate == null && !now.isBefore(DateTime(c.receivedDate.year, c.receivedDate.month + 4, c.receivedDate.day))) return 'Due Soon';
+    if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null && !now.isBefore(DateTime(c.receivedDate.year, c.receivedDate.month + 5, c.receivedDate.day))) return 'Overdue';
+    if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null && !now.isBefore(DateTime(c.receivedDate.year, c.receivedDate.month + 4, c.receivedDate.day))) return 'Due Soon';
     return 'Healthy';
   }
 
@@ -49,9 +49,9 @@ class CaseList extends StatelessWidget {
       d = DateTime(c.awardDate!.year, c.awardDate!.month + 2, c.awardDate!.day + 15);
     } else if (c.depositDate != null && c.feesReceivedDate == null) {
       d = c.depositDate!.add(const Duration(days: 7));
-    } else if (c.policeDocumentsDate == null) {
+    } else if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
       d = DateTime(c.receivedDate.year, c.receivedDate.month + 3, c.receivedDate.day);
-    } else if (c.caseFiledDate == null) {
+    } else if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
       d = DateTime(c.receivedDate.year, c.receivedDate.month + 4, c.receivedDate.day);
     }
     if (d == null) return '—';
