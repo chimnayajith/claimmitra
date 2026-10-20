@@ -5,6 +5,7 @@ import '../../../database/case_database.dart';
 import '../models/case.dart';
 import '../services/deadline_service.dart';
 import '../services/excel_service.dart';
+import 'case_sort.dart';
 
 enum CaseFilter { all, needsAttention, active, closed }
 
@@ -313,12 +314,7 @@ class _CasesScreenState extends State<CasesScreen> {
               if (ad != null) return -1;
               if (bd != null) return 1;
             }
-            final an = a.caseNumber?.trim().isNotEmpty ?? false;
-            final bn = b.caseNumber?.trim().isNotEmpty ?? false;
-            if (a.year != b.year) return b.year.compareTo(a.year);
-            if (an != bn) return an ? -1 : 1;
-            if (an && bn) return a.caseNumber!.compareTo(b.caseNumber!);
-            return a.clientName.toLowerCase().compareTo(b.clientName.toLowerCase());
+            return compareCasesForList(a, b);
           });
 
         return SingleChildScrollView(

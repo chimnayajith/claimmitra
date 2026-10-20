@@ -16,7 +16,7 @@ class UpdateService {
   static final UpdateService instance = UpdateService._();
 
   static const repository = 'chimnayajith/claimmitra';
-  static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
+  static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.1');
 
   Future<AvailableUpdate?> checkForUpdate() async {
     try {
