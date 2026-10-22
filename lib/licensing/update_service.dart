@@ -16,7 +16,7 @@ class UpdateService {
   static final UpdateService instance = UpdateService._();
 
   static const repository = 'chimnayajith/claimmitra';
-  static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.4');
+  static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.5');
 
   Future<AvailableUpdate?> checkForUpdate() async {
     try {
@@ -48,7 +48,7 @@ class UpdateService {
     }
   }
 
-  bool _isNewer(String remote, String local) {
+  static bool isNewerVersion(String remote, String local) {
     List<int> parse(String version) => version.split('+').first.split('.').map((part) {
       final match = RegExp(r'^\d+').firstMatch(part.trim());
       return int.tryParse(match?.group(0) ?? '') ?? 0;
@@ -62,6 +62,8 @@ class UpdateService {
     }
     return false;
   }
+
+  bool _isNewer(String remote, String local) => isNewerVersion(remote, local);
 
   Future<void> openDownload(String url) async {
     if (!Platform.isWindows) return;

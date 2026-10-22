@@ -24,6 +24,11 @@ class CaseRecord {
   final double? executionDepositAmount;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String courtFiled;
+  final String advocates;
+  final String? epFilingType;
+  final bool isArchived;
+  final DateTime? archivedAt;
 
   const CaseRecord({
     required this.id,
@@ -51,6 +56,11 @@ class CaseRecord {
     this.executionDepositAmount,
     required this.createdAt,
     required this.updatedAt,
+    this.courtFiled = '',
+    this.advocates = '',
+    this.epFilingType,
+    this.isArchived = false,
+    this.archivedAt,
   });
 
   bool get isClosed => depositDate != null && feesReceivedDate != null ||
@@ -58,8 +68,49 @@ class CaseRecord {
 
   int get year => receivedDate.year;
 
+  String? get displayCaseNumber => formatCaseNumber(caseNumber, receivedDate.year);
+  static String? formatCaseNumber(String? value, int receivedYear) {
+    final s = value?.trim();
+    if (s == null || s.isEmpty) return null;
+    final m = RegExp(r'^\s*(\d+)\s*/\s*(\d+)\s*$').firstMatch(s);
+    if (m == null) return s;
+    final a = m.group(1)!, b = m.group(2)!;
+    if (a.length == 4 && b.length == 4) return '$a/$b';
+    if (a.length == 4 && int.tryParse(a) == receivedYear) return '$b/$a';
+    if (b.length == 4 && int.tryParse(b) == receivedYear) return '$a/$b';
+    // Historic databases used YEAR/NUMBER; preserve that interpretation for
+    // unambiguous four-digit year prefixes.
+    if (a.length == 4) return '$b/$a';
+    return '$a/$b';
+  }
+
+  static String normalizeAdvocates(String? value) {
+    final names = <String>[];
+    final seen = <String>{};
+    for (final raw in (value ?? '').split(',')) {
+      final name = raw.trim().replaceAll(RegExp(r'\s+'), ' ');
+      if (name.isNotEmpty && seen.add(name.toLowerCase())) names.add(name);
+    }
+    return names.join(', ');
+  }
+
+  static bool matchesAdvocateQuery(String? advocates, String query) {
+    final needle = query.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+    if (needle.isEmpty) return false;
+    return normalizeAdvocates(advocates).split(',').any((rawName) {
+      final name = rawName.trim().toLowerCase();
+      if (name == needle) return true;
+      // A single-word search can match a complete name word (for example,
+      // "Doe" in "John Doe"), but never a substring such as "Ann" in "Anna".
+      if (!needle.contains(' ')) {
+        return name.split(RegExp(r'\s+')).contains(needle);
+      }
+      return false;
+    });
+  }
+
   Map<String, Object?> toMap() => {
-    'id': id, 'case_number': _clean(caseNumber),
+    'id': id, 'case_number': _clean(displayCaseNumber),
     'received_date': _date(receivedDate), 'accident_date': _date(accidentDate),
     'client_name': clientName, 'address': address, 'phone': phone,
     'police_station': policeStation, 'responsible_party': responsibleParty,
@@ -72,13 +123,16 @@ class CaseRecord {
     'fees_amount': feesAmount, 'ep_filed_date': _date(epFiledDate),
     'execution_deposit_date': _date(executionDepositDate),
     'execution_deposit_amount': executionDepositAmount,
+    'court_filed': _clean(courtFiled), 'advocates': _clean(normalizeAdvocates(advocates)),
+    'ep_filing_type': epFilingType ?? (epFiledDate == null ? null : 'EP'),
+    'is_archived': isArchived ? 1 : 0, 'archived_at': _date(archivedAt),
     'created_at': createdAt.toIso8601String(), 'updated_at': updatedAt.toIso8601String(),
   };
 
   factory CaseRecord.fromMap(Map<String, Object?> m) => CaseRecord(
     id: m['id'] as String,
-    caseNumber: m['case_number'] as String?,
     receivedDate: DateTime.parse(m['received_date'] as String),
+    caseNumber: formatCaseNumber(m['case_number'] as String?, DateTime.parse(m['received_date'] as String).year),
     accidentDate: _parseDate(m['accident_date']),
     clientName: (m['client_name'] as String?) ?? '',
     address: (m['address'] as String?) ?? '',
@@ -99,6 +153,11 @@ class CaseRecord {
     epFiledDate: _parseDate(m['ep_filed_date']),
     executionDepositDate: _parseDate(m['execution_deposit_date']),
     executionDepositAmount: _double(m['execution_deposit_amount']),
+    courtFiled: (m['court_filed'] as String?) ?? '',
+    advocates: normalizeAdvocates(m['advocates'] as String?),
+    epFilingType: (m['ep_filing_type'] as String?) ?? (_parseDate(m['ep_filed_date']) == null ? null : 'EP'),
+    isArchived: (m['is_archived'] as int? ?? 0) != 0,
+    archivedAt: _parseDate(m['archived_at']),
     createdAt: DateTime.tryParse((m['created_at'] as String?) ?? '') ?? DateTime.now(),
     updatedAt: DateTime.tryParse((m['updated_at'] as String?) ?? '') ?? DateTime.now(),
   );
@@ -111,7 +170,8 @@ class CaseRecord {
     double? awardAmount, double? awardAmountInterestCost, DateTime? depositDate,
     double? depositAmount, DateTime? feesReceivedDate, double? feesAmount,
     DateTime? epFiledDate, DateTime? executionDepositDate,
-    double? executionDepositAmount, bool clearCaseNumber = false,
+    double? executionDepositAmount, String? courtFiled, String? advocates, String? epFilingType,
+    bool? isArchived, DateTime? archivedAt, bool clearCaseNumber = false,
     bool clearAccidentDate = false, bool clearPoliceDocumentsDate = false,
     bool clearCaseFiledDate = false, bool clearEvidenceDate = false,
     bool clearAwardDate = false, bool clearAwardType = false,
@@ -141,6 +201,9 @@ class CaseRecord {
     epFiledDate: clearEpFiledDate ? null : (epFiledDate ?? this.epFiledDate),
     executionDepositDate: clearExecutionDepositDate ? null : (executionDepositDate ?? this.executionDepositDate),
     executionDepositAmount: clearExecutionDepositAmount ? null : (executionDepositAmount ?? this.executionDepositAmount),
+    courtFiled: courtFiled ?? this.courtFiled, advocates: advocates ?? this.advocates,
+    epFilingType: epFilingType ?? this.epFilingType, isArchived: isArchived ?? this.isArchived,
+    archivedAt: archivedAt ?? this.archivedAt,
     createdAt: createdAt, updatedAt: DateTime.now(),
   );
 

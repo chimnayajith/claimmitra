@@ -1,6 +1,6 @@
 import '../models/case.dart';
 
-final RegExp _caseNumberPattern = RegExp(r'^\s*(\d{4})\s*/\s*(\d+)\s*$');
+final RegExp _caseNumberPattern = RegExp(r'^\s*(\d+)\s*/\s*(\d{4})\s*$');
 
 int compareCasesForList(CaseRecord a, CaseRecord b) {
   final aNumber = a.caseNumber?.trim();
@@ -9,16 +9,16 @@ int compareCasesForList(CaseRecord a, CaseRecord b) {
   final bHasNumber = bNumber?.isNotEmpty ?? false;
   final aParts = aHasNumber ? _caseNumberPattern.firstMatch(aNumber!) : null;
   final bParts = bHasNumber ? _caseNumberPattern.firstMatch(bNumber!) : null;
-  final aYear = int.tryParse(aParts?.group(1) ?? '') ?? a.receivedDate.year;
-  final bYear = int.tryParse(bParts?.group(1) ?? '') ?? b.receivedDate.year;
+  final aYear = int.tryParse(aParts?.group(2) ?? '') ?? a.receivedDate.year;
+  final bYear = int.tryParse(bParts?.group(2) ?? '') ?? b.receivedDate.year;
 
   if (aYear != bYear) return bYear.compareTo(aYear);
   if (aHasNumber != bHasNumber) return aHasNumber ? -1 : 1;
 
   if (aHasNumber && bHasNumber) {
     if (aParts != null && bParts != null) {
-      final sequenceComparison = int.parse(aParts.group(2)!).compareTo(
-        int.parse(bParts.group(2)!),
+      final sequenceComparison = int.parse(aParts.group(1)!).compareTo(
+        int.parse(bParts.group(1)!),
       );
       if (sequenceComparison != 0) return sequenceComparison;
     }

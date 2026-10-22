@@ -9,17 +9,21 @@ import '../services/excel_service.dart';
 import 'case_sort.dart';
 
 enum CaseFilter { all, needsAttention, active, closed }
+enum CaseSearchScope { all, client, advocate }
 
 class CasesScreen extends StatefulWidget {
   final String? view;
   final String? stage;
-  const CasesScreen({super.key, this.view, this.stage});
+  final bool archived;
+  const CasesScreen({super.key, this.view, this.stage, this.archived = false});
   @override
   State<CasesScreen> createState() => _CasesScreenState();
 }
 
 class _CasesScreenState extends State<CasesScreen> {
+  bool get archived => widget.archived;
   CaseFilter _filter = CaseFilter.all;
+  CaseSearchScope _searchScope = CaseSearchScope.all;
   String _query = '';
   final Set<String> _selectedIds = <String>{};
   late Future<List<CaseRecord>> _future;
@@ -27,13 +31,26 @@ class _CasesScreenState extends State<CasesScreen> {
   @override
   void initState() {
     super.initState();
-    _future = CaseDatabase.instance.allCases();
+    _future = CaseDatabase.instance.allCases(includeArchived: true);
   }
 
   void _refresh() {
     setState(() {
-      _future = CaseDatabase.instance.allCases();
+      _future = CaseDatabase.instance.allCases(includeArchived: true);
     });
+  }
+
+  Future<void> _restoreCase(String id) async {
+    try {
+      await CaseDatabase.instance.restore(id);
+      if (mounted) _refresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not restore case: $e')),
+        );
+      }
+    }
   }
 
   void _toggleSelected(String id, bool selected) {
@@ -46,38 +63,40 @@ class _CasesScreenState extends State<CasesScreen> {
     });
   }
 
-  Future<void> _deleteSelected() async {
+  Future<void> _processSelected() async {
     final ids = _selectedIds.toList();
     if (ids.isEmpty) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete ${ids.length} case${ids.length == 1 ? '' : 's'}?'),
-        content: const Text('This permanently deletes the selected cases and their saved details. This action cannot be undone.'),
+        title: Text('${archived ? 'Restore' : 'Archive'} ${ids.length} case${ids.length == 1 ? '' : 's'}?'),
+        content: Text(archived
+            ? 'The selected cases will return to active lists and dashboard counts.'
+            : 'Archived cases are hidden from active lists and dashboard counts. You can restore them later.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton.tonal(
-            style: FilledButton.styleFrom(foregroundColor: Colors.red),
+            style: archived ? null : FilledButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text(archived ? 'Restore' : 'Archive'),
           ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
     try {
-      await CaseDatabase.instance.deleteMany(ids);
+      await CaseDatabase.instance.setArchived(ids, archived: !archived);
       if (!mounted) return;
       setState(() {
         _selectedIds.clear();
-        _future = CaseDatabase.instance.allCases();
+        _future = CaseDatabase.instance.allCases(includeArchived: true);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Deleted ${ids.length} case${ids.length == 1 ? '' : 's'}.')),
+        SnackBar(content: Text('${archived ? 'Restored' : 'Archived'} ${ids.length} case${ids.length == 1 ? '' : 's'}.')),
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not delete cases: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not ${archived ? 'restore' : 'archive'} cases: $e')));
       }
     }
   }
@@ -163,7 +182,7 @@ class _CasesScreenState extends State<CasesScreen> {
   String _stage(CaseRecord c) {
     if (c.isClosed) return 'Closed';
     if (c.executionDepositDate != null) return 'Deposit Against Execution';
-    if (c.epFiledDate != null) return 'EP Filing';
+    if (c.epFiledDate != null) return c.epFilingType == 'RR' ? 'RR Filing' : 'EP Filing';
     if (c.feesReceivedDate != null) return 'Fees Received';
     if (c.depositDate != null) return 'Fees Received';
     if (c.awardDate != null) return 'Deposit';
@@ -197,6 +216,24 @@ class _CasesScreenState extends State<CasesScreen> {
       if (!now.isBefore(DeadlineService.addMonths(start, 4))) return 'Due Soon';
     }
     return 'Healthy';
+  }
+
+  bool _matchesSearch(CaseRecord c, String query, String caseNumberQuery) {
+    if (query.isEmpty) return true;
+    final matchesClient = c.clientName.toLowerCase().contains(query);
+    final matchesAdvocate = CaseRecord.matchesAdvocateQuery(c.advocates, query);
+    switch (_searchScope) {
+      case CaseSearchScope.client:
+        return matchesClient;
+      case CaseSearchScope.advocate:
+        return matchesAdvocate;
+      case CaseSearchScope.all:
+        return (c.displayCaseNumber ?? '').toLowerCase().contains(caseNumberQuery) ||
+            matchesClient ||
+            matchesAdvocate ||
+            _stage(c).toLowerCase().contains(query) ||
+            c.phone.toLowerCase().contains(query);
+    }
   }
 
   Color _statusColor(String s) => switch (s) {
@@ -281,8 +318,9 @@ class _CasesScreenState extends State<CasesScreen> {
 
   Future<void> _export() async {
     try {
-      final path = await ExcelService.exportCases(await CaseDatabase.instance.allCases());
-      if (mounted && path != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Exported to $path')));
+      final records = (await CaseDatabase.instance.allCases(includeArchived: true)).where((c) => archived || !c.isArchived).toList();
+      final path = await ExcelService.exportCases(records);
+      if (mounted && path != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Exported ${archived ? 'archived' : 'active'} cases to $path')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
@@ -300,15 +338,13 @@ class _CasesScreenState extends State<CasesScreen> {
           future: _future,
           builder: (context, snapshot) {
         final all = snapshot.data ?? <CaseRecord>[];
-        final q = _query.trim().toLowerCase();
+        final q = _query.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+        final caseNumberQuery = q.replaceAll(RegExp(r'\s+'), '');
         final cases = all.where((c) {
+          if (c.isArchived != archived) return false;
           final status = _status(c);
           final matchesPreset = _matchesPreset(c);
-          final matchesQuery = q.isEmpty ||
-              (c.caseNumber ?? '').toLowerCase().contains(q) ||
-              c.clientName.toLowerCase().contains(q) ||
-              _stage(c).toLowerCase().contains(q) ||
-              c.phone.toLowerCase().contains(q);
+          final matchesQuery = _matchesSearch(c, q, caseNumberQuery);
           final matchesFilter = switch (_filter) {
             CaseFilter.all => true,
             CaseFilter.needsAttention => status == 'Due Soon' || status == 'Overdue',
@@ -332,20 +368,41 @@ class _CasesScreenState extends State<CasesScreen> {
           padding: const EdgeInsets.all(32),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              Text(_pageTitle, style: Theme.of(context).textTheme.headlineLarge),
+              Text(archived ? 'Archived Cases' : _pageTitle, style: Theme.of(context).textTheme.headlineLarge),
+              OutlinedButton.icon(onPressed: () => context.go(archived ? '/cases?view=all' : '/cases?archived=true'), icon: Icon(archived ? Icons.folder_open : Icons.archive_outlined), label: Text(archived ? 'Active cases' : 'Archived cases')),
               FilledButton.icon(onPressed: () => context.go('/cases/new'), icon: const Icon(Icons.add), label: const Text('New Case')),
               OutlinedButton.icon(onPressed: _import, icon: const Icon(Icons.file_upload_outlined), label: const Text('Import Excel')),
-              OutlinedButton.icon(onPressed: _export, icon: const Icon(Icons.file_download_outlined), label: const Text('Export Excel')),
+              OutlinedButton.icon(onPressed: _export, icon: const Icon(Icons.file_download_outlined), label: Text(archived ? 'Export archived Excel' : 'Export active Excel')),
             ]),
             const SizedBox(height: 24),
             TextField(
               onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
-                hintText: 'Search case number, client, stage or phone...',
+                hintText: switch (_searchScope) {
+                  CaseSearchScope.all => 'Search case number, client, advocate, stage or phone...',
+                  CaseSearchScope.client => 'Search client name...',
+                  CaseSearchScope.advocate => 'Search advocate name...',
+                },
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _query.isEmpty ? null : IconButton(onPressed: () => setState(() => _query = ''), icon: const Icon(Icons.close)),
               ),
             ),
+            const SizedBox(height: 8),
+            Row(children: [
+              Text('Search in', style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(width: 12),
+              DropdownButton<CaseSearchScope>(
+                value: _searchScope,
+                items: const [
+                  DropdownMenuItem(value: CaseSearchScope.all, child: Text('All fields')),
+                  DropdownMenuItem(value: CaseSearchScope.client, child: Text('Client only')),
+                  DropdownMenuItem(value: CaseSearchScope.advocate, child: Text('Advocate only')),
+                ],
+                onChanged: (scope) {
+                  if (scope != null) setState(() => _searchScope = scope);
+                },
+              ),
+            ]),
             const SizedBox(height: 20),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -382,10 +439,9 @@ class _CasesScreenState extends State<CasesScreen> {
                   Text('${_selectedIds.length} selected'),
                   const SizedBox(width: 12),
                   FilledButton.icon(
-                    onPressed: _deleteSelected,
-                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Delete selected'),
+                    onPressed: _processSelected,
+                    icon: Icon(archived ? Icons.restore : Icons.archive_outlined),
+                    label: Text(archived ? 'Restore selected' : 'Archive selected'),
                   ),
                 ],
               ],
@@ -424,13 +480,14 @@ class _CasesScreenState extends State<CasesScreen> {
                               }
                             });
                           },
-                          columns: const [
+                          columns: [
                             DataColumn(label: Text('Select')),
                             DataColumn(label: Text('Case No.')),
                             DataColumn(label: Text('Client Name')),
                             DataColumn(label: Text('Current Stage')),
                             DataColumn(label: Text('Due')),
                             DataColumn(label: Text('Status')),
+                            if (archived) DataColumn(label: Text('Action')),
                           ],
                           rows: cases.map((c) {
                             final status = _status(c);
@@ -442,7 +499,7 @@ class _CasesScreenState extends State<CasesScreen> {
                               },
                               cells: [
                                 DataCell(Checkbox(value: _selectedIds.contains(c.id), onChanged: (selected) => _toggleSelected(c.id, selected ?? false))),
-                                DataCell(Text((c.caseNumber?.trim().isNotEmpty ?? false) ? c.caseNumber! : 'No case number')),
+                                DataCell(Text((c.displayCaseNumber?.trim().isNotEmpty ?? false) ? c.displayCaseNumber! : 'No case number')),
                                 DataCell(Text(c.clientName)),
                                 DataCell(Text(_stage(c))),
                                 DataCell(Text(_due(c))),
@@ -451,6 +508,12 @@ class _CasesScreenState extends State<CasesScreen> {
                                   decoration: BoxDecoration(color: _statusColor(status).withValues(alpha: .12), borderRadius: BorderRadius.circular(20)),
                                   child: Text(status, style: TextStyle(color: _statusColor(status), fontWeight: FontWeight.w600)),
                                 )),
+                                if (archived)
+                                  DataCell(TextButton.icon(
+                                        onPressed: () => _restoreCase(c.id),
+                                        icon: const Icon(Icons.restore),
+                                        label: const Text('Restore'),
+                                      )),
                               ],
                             );
                           }).toList(),

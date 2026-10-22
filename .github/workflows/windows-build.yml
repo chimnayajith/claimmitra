@@ -40,6 +40,21 @@ jobs:
           Copy-Item 'installer/claimmitra.ico' `
             'windows/runner/resources/app_icon.ico' -Force
 
+          $mainCpp = 'windows/runner/main.cpp'
+          if (Test-Path $mainCpp) {
+            (Get-Content $mainCpp -Raw).Replace('L"claimmitra"', 'L"ClaimMitra"') |
+              Set-Content $mainCpp
+          }
+          $rc = 'windows/runner/Runner.rc'
+          if (Test-Path $rc) {
+            $content = Get-Content $rc -Raw
+            $content = $content -replace 'VALUE "FileDescription", ".*"', 'VALUE "FileDescription", "ClaimMitra - Insurance Claim Case Management"'
+            $content = $content -replace 'VALUE "ProductName", ".*"', 'VALUE "ProductName", "ClaimMitra"'
+            $content = $content -replace 'VALUE "InternalName", ".*"', 'VALUE "InternalName", "ClaimMitra"'
+            $content = $content -replace 'VALUE "OriginalFilename", ".*"', 'VALUE "OriginalFilename", "ClaimMitra.exe"'
+            Set-Content $rc $content
+          }
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -55,7 +70,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           LICENSE_PUBLIC_KEY_B64: ${{ secrets.LICENSE_PUBLIC_KEY_B64 }}
-          APP_VERSION: 1.0.4
+          APP_VERSION: 1.0.5
         run: |
           if (!$env:SUPABASE_URL -or !$env:SUPABASE_ANON_KEY -or !$env:LICENSE_PUBLIC_KEY_B64) {
             throw 'Missing licensing build secrets'
@@ -71,8 +86,8 @@ jobs:
         shell: pwsh
         run: |
           $release = 'build/windows/x64/runner/Release'
-          if (!(Test-Path "$release/claimmitra.exe")) {
-            throw 'claimmitra.exe missing from build output'
+          if (!(Test-Path "$release/ClaimMitra.exe")) {
+            throw 'ClaimMitra.exe missing from build output'
           }
           if (!(Test-Path "$release/flutter_windows.dll")) {
             throw 'flutter_windows.dll missing from build output'
@@ -93,7 +108,7 @@ jobs:
       - name: Verify installer
         shell: pwsh
         run: |
-          $installer = 'dist/ClaimMitra-Setup-1.0.4.exe'
+          $installer = 'dist/ClaimMitra-Setup-1.0.5.exe'
           if (!(Test-Path $installer)) {
             throw "Installer not found: $installer"
           }
@@ -102,6 +117,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ClaimMitra-Windows-Installer
-          path: dist/ClaimMitra-Setup-1.0.4.exe
+          path: dist/ClaimMitra-Setup-1.0.5.exe
           if-no-files-found: error
           retention-days: 30

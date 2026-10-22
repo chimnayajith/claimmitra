@@ -6,11 +6,11 @@ void main() {
   test('sorts numbered cases by numeric sequence before unnumbered cases', () {
     final cases = [
       _case('missing-new', null, DateTime(2026, 9, 1)),
-      _case('number-10', '2026/010', DateTime(2026, 1, 1)),
-      _case('number-2', '2026/002', DateTime(2026, 2, 1)),
+      _case('number-10', '010/2026', DateTime(2026, 1, 1)),
+      _case('number-2', '002/2026', DateTime(2026, 2, 1)),
       _case('missing-old', null, DateTime(2026, 3, 1)),
-      _case('number-1', '2026/001', DateTime(2026, 4, 1)),
-      _case('older-year', '2025/999', DateTime(2025, 12, 1)),
+      _case('number-1', '001/2026', DateTime(2026, 4, 1)),
+      _case('older-year', '999/2025', DateTime(2025, 12, 1)),
     ]..sort(compareCasesForList);
 
     expect(cases.map((c) => c.id).toList(), [

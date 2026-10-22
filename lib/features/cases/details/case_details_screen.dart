@@ -26,6 +26,8 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   final _phone = TextEditingController();
   final _station = TextEditingController();
   final _responsible = TextEditingController();
+  final _courtFiled = TextEditingController();
+  final _advocates = TextEditingController();
   final _police = TextEditingController();
   final _filed = TextEditingController();
   final _evidence = TextEditingController();
@@ -33,6 +35,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   final _awardAmount = TextEditingController();
   final _awardAmountInterestCost = TextEditingController();
   String? _awardType;
+  String? _epFilingType;
   Timer? _autosaveTimer;
   bool _autoSaving = false;
   final _deposit = TextEditingController();
@@ -65,6 +68,8 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       _phone,
       _station,
       _responsible,
+      _courtFiled,
+      _advocates,
       _police,
       _filed,
       _evidence,
@@ -82,14 +87,15 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       controller.clear();
     }
     _awardType = null;
+    _epFilingType = null;
     if (!_isNew) {
       _record = await CaseDatabase.instance.getCase(widget.caseId);
       final c = _record;
       if (c != null) {
         final caseParts = (c.caseNumber ?? '').split('/');
         if (caseParts.length == 2) {
-          _caseYear.text = caseParts[0].trim();
-          _caseSequence.text = caseParts[1].trim();
+          _caseSequence.text = caseParts[0].trim();
+          _caseYear.text = caseParts[1].trim();
         } else if (caseParts.length == 1 && caseParts[0].trim().isNotEmpty) {
           _caseSequence.text = caseParts[0].trim();
         }
@@ -100,6 +106,8 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
         _phone.text = c.phone;
         _station.text = c.policeStation;
         _responsible.text = c.responsibleParty;
+        _courtFiled.text = c.courtFiled;
+        _advocates.text = c.advocates;
         _police.text = _fmt(c.policeDocumentsDate);
         _filed.text = _fmt(c.caseFiledDate);
         _evidence.text = _fmt(c.evidenceDate);
@@ -112,6 +120,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
         _fees.text = _fmt(c.feesReceivedDate);
         _feesAmount.text = c.feesAmount?.toString() ?? '';
         _ep.text = _fmt(c.epFiledDate);
+        _epFilingType = c.epFilingType ?? (c.epFiledDate == null ? null : 'EP');
         _execution.text = _fmt(c.executionDepositDate);
         _executionAmount.text = c.executionDepositAmount?.toString() ?? '';
       }
@@ -131,7 +140,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   @override
   void dispose() {
     for (final c in [
-      _caseYear,_caseSequence,_received,_accident,_name,_address,_phone,_station,_responsible,
+      _caseYear,_caseSequence,_received,_accident,_name,_address,_phone,_station,_responsible,_courtFiled,_advocates,
       _police,_filed,_evidence,_award,_awardAmount,_awardAmountInterestCost,_deposit,_depositAmount,_fees,_feesAmount,_ep,_execution,_executionAmount,
     ]) { c.dispose(); }
     _autosaveTimer?.cancel();
@@ -286,7 +295,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       id: old?.id ?? 'case_${now.microsecondsSinceEpoch}',
       caseNumber: _caseYear.text.trim().isEmpty && _caseSequence.text.trim().isEmpty
           ? null
-          : '${_caseYear.text.trim()}/${_caseSequence.text.trim()}',
+          : '${_caseSequence.text.trim()}/${_caseYear.text.trim()}',
       receivedDate: received,
       accidentDate: _parse(_accident.text),
       clientName: _name.text.trim(),
@@ -294,6 +303,8 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       phone: _phone.text.trim(),
       policeStation: _station.text.trim(),
       responsibleParty: _responsible.text.trim(),
+      courtFiled: _courtFiled.text.trim(),
+      advocates: CaseRecord.normalizeAdvocates(_advocates.text),
       policeDocumentsDate: _parse(_police.text),
       caseFiledDate: _parse(_filed.text),
       evidenceDate: _parse(_evidence.text),
@@ -306,8 +317,11 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       feesReceivedDate: _parse(_fees.text),
       feesAmount: _money(_feesAmount.text),
       epFiledDate: _parse(_ep.text),
+      epFilingType: _epFilingType ?? (_parse(_ep.text) == null ? null : 'EP'),
       executionDepositDate: _parse(_execution.text),
       executionDepositAmount: _money(_executionAmount.text),
+      isArchived: old?.isArchived ?? false,
+      archivedAt: old?.archivedAt,
       createdAt: old?.createdAt ?? now,
       updatedAt: now,
     );
@@ -332,7 +346,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
 
   bool get _detailsReady => _parse(_received.text) != null && _name.text.trim().isNotEmpty;
   bool get _hasCaseNumber => _caseYear.text.trim().isNotEmpty && _caseSequence.text.trim().isNotEmpty;
-  String get _combinedCaseNumber => _hasCaseNumber ? '${_caseYear.text.trim()}/${_caseSequence.text.trim()}' : ''; 
+  String get _combinedCaseNumber => _hasCaseNumber ? '${_caseSequence.text.trim()}/${_caseYear.text.trim()}' : '';
   bool get _policeReady => _hasCaseNumber || _parse(_police.text) != null;
   bool get _filedReady => _hasCaseNumber || _parse(_filed.text) != null;
   bool get _evidenceReady => _parse(_evidence.text) != null;
@@ -392,7 +406,11 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             const SizedBox(width: 8),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_name.text.isEmpty ? (_isNew ? 'New Case' : 'Case Details') : _name.text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleLarge),
-              Text(_combinedCaseNumber.isEmpty ? 'No case number assigned' : 'Case No. $_combinedCaseNumber', style: Theme.of(context).textTheme.bodySmall),
+              Text([
+                _combinedCaseNumber.isEmpty ? 'No case number assigned' : 'Case No. $_combinedCaseNumber',
+                if (_courtFiled.text.trim().isNotEmpty) 'Court: ${_courtFiled.text.trim()}',
+                if (_advocates.text.trim().isNotEmpty) 'Advocates: ${CaseRecord.normalizeAdvocates(_advocates.text)}',
+              ].join('  •  '), style: Theme.of(context).textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
             ])),
             if (_autoSaving) const Padding(padding: EdgeInsets.only(right: 12), child: Text('Autosaving…')),
             FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save_outlined), label: Text(_saving ? 'Saving...' : 'Save')),
@@ -411,12 +429,13 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
               _section(1, 'Case Details', 'Basic information and client contact details', completed: _detailsReady, child: Column(children: [
                 _row(
                   Row(children: [
-                    Expanded(child: _field(_caseYear, 'Case Year', numeric: true)),
-                    const SizedBox(width: 12),
                     Expanded(child: _field(_caseSequence, 'Case Number', numeric: true)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _field(_caseYear, 'Case Year', numeric: true)),
                   ]),
                   _date(_received,'Case Received Date', requiredField: true),
                 ),
+                const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(top: 6), child: Text('Case number format: NUMBER/YEAR'))),
                 const SizedBox(height: 16),
                 _row(_date(_accident,'Date of Accident'), _field(_name,'Client Name', requiredField: true)),
                 const SizedBox(height: 16),
@@ -425,6 +444,8 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
                 _row(_field(_phone,'Phone Number', numeric: true), _field(_station,'Police Station')),
                 const SizedBox(height: 16),
                 _field(_responsible,'Responsible Company / Person'),
+                const SizedBox(height: 16),
+                _row(_field(_courtFiled,'Court Filed'), _field(_advocates,'Advocate (comma-separated)', maxLines: 2)),
               ])),
               _connector(),
               _section(2, _hasCaseNumber ? 'Police Documents (Skipped)' : 'Police Documents', _hasCaseNumber ? 'Case number already assigned; continue with case filing and evidence' : 'Deadline: 3 months yellow · 4 months orange · 5 months red', locked: !_detailsReady, completed: _policeReady, deadline: policeDeadline, status: received == null ? null : _dateStatus(received, _parse(_police.text), DeadlineService.addMonths(received,3), orange: DeadlineService.addMonths(received,4), red: DeadlineService.addMonths(received,5)), child: _hasCaseNumber ? const SizedBox.shrink() : _date(_police,'Documents Received Date')),
@@ -447,7 +468,50 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
               _connector(),
               _section(7, 'Fees Received', 'Due within 7 days of normal deposit', locked: !_depositReady, completed: _feesReady, deadline: deposit?.add(const Duration(days:7)), child: _row(_date(_fees,'Fees Received Date'), _field(_feesAmount,'Fees Amount (₹)', numeric: true))),
               _connector(),
-              _section(8, 'EP/RR Filing', 'Available from 4 months after award when no normal deposit has been made', locked: !_awardReady || deposit != null || (award != null && DateTime.now().isBefore(DeadlineService.addMonths(award, 4))), completed: _epReady, deadline: epDeadline, status: award == null || _epReady || deposit != null ? null : (DateTime.now().isBefore(DeadlineService.addMonths(award, 4)) ? 'Waiting' : 'Overdue'), child: _date(_ep,'EP Filed Date')),
+              _section(
+                8,
+                'EP/RR Filing',
+                'Available from 4 months after award when no normal deposit has been made',
+                locked: !_awardReady ||
+                    deposit != null ||
+                    (award != null &&
+                        DateTime.now().isBefore(
+                          DeadlineService.addMonths(award, 4),
+                        )),
+                completed: _epReady,
+                deadline: epDeadline,
+                status: award == null || _epReady || deposit != null
+                    ? null
+                    : (DateTime.now().isBefore(
+                            DeadlineService.addMonths(award, 4),
+                          )
+                        ? 'Waiting'
+                        : 'Overdue'),
+                child: Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: _epFilingType,
+                      decoration: const InputDecoration(labelText: 'Filing Type'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'EP',
+                          child: Text('EP — Execution Petition'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'RR',
+                          child: Text('RR — Revenue Recovery'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _epFilingType = value);
+                        _scheduleAutosave();
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _date(_ep, 'Filing Date'),
+                  ],
+                ),
+              ),
               _connector(),
               _section(9, 'Deposit Against Execution', 'Final deposit after EP filing', locked: !_epReady, completed: _executionReady, child: _row(_date(_execution,'Deposit Against Execution Date'), _field(_executionAmount,'Amount (₹)', numeric: true))),
               const SizedBox(height: 28),

@@ -28,6 +28,8 @@ class ExcelService {
     'Phone Number',
     'Police Station',
     'Responsible Company or Person',
+    'Court Filed',
+    'Advocates',
     'Police Documents Received Date',
     'Case Filed Date',
     'Evidence Date',
@@ -40,6 +42,7 @@ class ExcelService {
     'Fees Received Date',
     'Fees Amount',
     'EP Filed Date',
+    'EP/RR Filing Type',
     'Deposit Against Execution Date',
     'Deposit Against Execution Amount',
   ];
@@ -66,7 +69,7 @@ class ExcelService {
 
     for (final c in cases) {
       sheet.appendRow([
-        TextCellValue(c.caseNumber ?? ''),
+        TextCellValue(c.displayCaseNumber ?? ''),
         TextCellValue(_format(c.receivedDate)),
         TextCellValue(_format(c.accidentDate)),
         TextCellValue(c.clientName),
@@ -74,6 +77,8 @@ class ExcelService {
         TextCellValue(c.phone),
         TextCellValue(c.policeStation),
         TextCellValue(c.responsibleParty),
+        TextCellValue(c.courtFiled),
+        TextCellValue(c.advocates),
         TextCellValue(_format(c.policeDocumentsDate)),
         TextCellValue(_format(c.caseFiledDate)),
         TextCellValue(_format(c.evidenceDate)),
@@ -86,6 +91,7 @@ class ExcelService {
         TextCellValue(_format(c.feesReceivedDate)),
         TextCellValue(_formatAmount(c.feesAmount)),
         TextCellValue(_format(c.epFiledDate)),
+        TextCellValue(c.epFilingType ?? ''),
         TextCellValue(_format(c.executionDepositDate)),
         TextCellValue(_formatAmount(c.executionDepositAmount)),
       ]);
@@ -197,9 +203,9 @@ class ExcelService {
       return double.tryParse(s);
     }
 
-    final existing = await CaseDatabase.instance.allCases();
+    final existing = await CaseDatabase.instance.allCases(includeArchived: true);
     final knownNumbers = existing
-        .map((c) => c.caseNumber?.trim().toLowerCase())
+        .map((c) => CaseDatabase.normalizeCaseNumber(c.displayCaseNumber))
         .whereType<String>()
         .where((s) => s.isNotEmpty)
         .toSet();
@@ -227,7 +233,9 @@ class ExcelService {
         }
 
         final number = val(row, ['case number', 'case no', 'case no.']).trim();
-        final normalizedNumber = number.toLowerCase();
+        final normalizedNumber = CaseDatabase.normalizeCaseNumber(
+          CaseRecord.formatCaseNumber(number, received.year),
+        ) ?? '';
         if (normalizedNumber.isNotEmpty && knownNumbers.contains(normalizedNumber)) {
           skipped++;
           errors.add('Row $displayRow: Case number "$number" already exists; skipped.');
@@ -239,7 +247,7 @@ class ExcelService {
 
         records.add(CaseRecord(
           id: 'case_${now.microsecondsSinceEpoch}_${i}_${Random().nextInt(999999)}',
-          caseNumber: number.isEmpty ? null : number,
+          caseNumber: number.isEmpty ? null : CaseRecord.formatCaseNumber(number, received.year),
           receivedDate: received,
           accidentDate: _parseDate(val(row, ['accident date', 'date of accident'])),
           clientName: name.trim(),
@@ -253,6 +261,8 @@ class ExcelService {
             'company',
             'responsible person',
           ]),
+          courtFiled: optional(['court filed', 'court']),
+          advocates: CaseRecord.normalizeAdvocates(optional(['advocates', 'advocate'])),
           policeDocumentsDate: _parseDate(val(row, [
             'police documents date',
             'police documents received date',
@@ -273,6 +283,12 @@ class ExcelService {
           feesReceivedDate: _parseDate(val(row, ['fees received date', 'fees date'])),
           feesAmount: amount(val(row, ['fees amount'])),
           epFiledDate: _parseDate(val(row, ['ep filed date', 'ep filing date'])),
+          epFilingType: (() {
+            final type = optional(['ep/rr filing type', 'filing type']).toUpperCase();
+            if (type.startsWith('RR')) return 'RR';
+            if (type.startsWith('EP')) return 'EP';
+            return _parseDate(val(row, ['ep filed date', 'ep filing date'])) == null ? null : 'EP';
+          })(),
           executionDepositDate: _parseDate(val(row, [
             'deposit against execution date',
             'execution deposit date',

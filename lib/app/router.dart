@@ -25,6 +25,7 @@ final appRouter = GoRouter(
             return CasesScreen(
               view: state.uri.queryParameters['view'],
               stage: state.uri.queryParameters['stage'],
+              archived: state.uri.queryParameters['archived'] == 'true',
             );
           },
           routes: [
