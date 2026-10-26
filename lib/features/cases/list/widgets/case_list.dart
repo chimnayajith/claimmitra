@@ -30,8 +30,9 @@ class CaseList extends StatelessWidget {
     final now = DateTime.now();
     if (c.awardDate != null && c.depositDate == null && !now.isBefore(DateTime(c.awardDate!.year, c.awardDate!.month + 4, c.awardDate!.day))) return 'Overdue';
     if (c.depositDate != null && c.feesReceivedDate == null) return 'Due Soon';
-    if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null && !now.isBefore(DateTime(c.receivedDate.year, c.receivedDate.month + 5, c.receivedDate.day))) return 'Overdue';
-    if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null && !now.isBefore(DateTime(c.receivedDate.year, c.receivedDate.month + 4, c.receivedDate.day))) return 'Due Soon';
+    final received = c.receivedDate;
+    if (received != null && c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null && !now.isBefore(DateTime(received.year, received.month + 5, received.day))) return 'Overdue';
+    if (received != null && c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null && !now.isBefore(DateTime(received.year, received.month + 4, received.day))) return 'Due Soon';
     return 'Healthy';
   }
 
@@ -49,10 +50,10 @@ class CaseList extends StatelessWidget {
       d = DateTime(c.awardDate!.year, c.awardDate!.month + 2, c.awardDate!.day + 15);
     } else if (c.depositDate != null && c.feesReceivedDate == null) {
       d = c.depositDate!.add(const Duration(days: 7));
-    } else if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
-      d = DateTime(c.receivedDate.year, c.receivedDate.month + 3, c.receivedDate.day);
-    } else if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
-      d = DateTime(c.receivedDate.year, c.receivedDate.month + 4, c.receivedDate.day);
+    } else if (c.receivedDate != null && c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
+      d = DateTime(c.receivedDate!.year, c.receivedDate!.month + 3, c.receivedDate!.day);
+    } else if (c.receivedDate != null && c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
+      d = DateTime(c.receivedDate!.year, c.receivedDate!.month + 4, c.receivedDate!.day);
     }
     if (d == null) return '—';
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';

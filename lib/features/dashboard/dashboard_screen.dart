@@ -29,13 +29,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!now.isBefore(c.depositDate!.add(const Duration(days:7)))) return 'Overdue';
       return 'Due Soon';
     }
-    if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
-      if (!now.isBefore(DeadlineService.addMonths(c.receivedDate,5))) return 'Overdue';
-      if (!now.isBefore(DeadlineService.addMonths(c.receivedDate,3))) return 'Due Soon';
+    if (c.receivedDate != null && c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
+      if (!now.isBefore(DeadlineService.addMonths(c.receivedDate!,5))) return 'Overdue';
+      if (!now.isBefore(DeadlineService.addMonths(c.receivedDate!,3))) return 'Due Soon';
     }
-    if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
-      if (!now.isBefore(DeadlineService.addMonths(c.receivedDate,5))) return 'Overdue';
-      if (!now.isBefore(DeadlineService.addMonths(c.receivedDate,4))) return 'Due Soon';
+    if (c.receivedDate != null && c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
+      if (!now.isBefore(DeadlineService.addMonths(c.receivedDate!,5))) return 'Overdue';
+      if (!now.isBefore(DeadlineService.addMonths(c.receivedDate!,4))) return 'Due Soon';
     }
     return 'Healthy';
   }
@@ -60,12 +60,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             switch (stage) {
               case 'police':
                 pending = c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null;
-                orangeAt = DeadlineService.addMonths(c.receivedDate, 4);
-                redAt = DeadlineService.addMonths(c.receivedDate, 5);
+                if (c.receivedDate != null) {
+                  orangeAt = DeadlineService.addMonths(c.receivedDate!, 4);
+                  redAt = DeadlineService.addMonths(c.receivedDate!, 5);
+                }
                 break;
               case 'filing':
                 pending = c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate != null && c.caseFiledDate == null;
-                redAt = DeadlineService.addMonths(c.receivedDate, 5);
+                if (c.receivedDate != null) redAt = DeadlineService.addMonths(c.receivedDate!, 5);
                 break;
               case 'deposit':
                 pending = c.awardDate != null && c.depositDate == null && c.executionDepositDate == null;

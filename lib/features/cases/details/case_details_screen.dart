@@ -284,7 +284,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       return;
     }
     final received = _parse(_received.text);
-    if (received == null) {
+    if (received == null && !_hasCaseNumber) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a valid Case Received Date.')));
       return;
     }
@@ -344,7 +344,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
     }
   }
 
-  bool get _detailsReady => _parse(_received.text) != null && _name.text.trim().isNotEmpty;
+  bool get _detailsReady => (_hasCaseNumber || _parse(_received.text) != null) && _name.text.trim().isNotEmpty;
   bool get _hasCaseNumber => _caseYear.text.trim().isNotEmpty && _caseSequence.text.trim().isNotEmpty;
   String get _combinedCaseNumber => _hasCaseNumber ? '${_caseSequence.text.trim()}/${_caseYear.text.trim()}' : '';
   bool get _policeReady => _hasCaseNumber || _parse(_police.text) != null;
@@ -454,7 +454,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
               _connector(),
               _section(4, 'Evidence', 'Record the evidence date', locked: !_filedReady, completed: _evidenceReady, child: _date(_evidence,'Evidence Date')),
               _connector(),
-              _section(5, 'Award / Court Decision', 'Record the award date and amounts', locked: !_evidenceReady, completed: _awardReady, child: Column(children: [
+                _section(5, 'Award / Court Decision', 'Record the award date and amounts', locked: !_filedReady, completed: _awardReady, child: Column(children: [
                 DropdownButtonFormField<String>(initialValue: _awardType, decoration: const InputDecoration(labelText: 'Type of Award'), items: const [DropdownMenuItem(value: 'Settlement', child: Text('Settlement')), DropdownMenuItem(value: 'Court', child: Text('Court'))], onChanged: (value) { setState(() => _awardType = value); _scheduleAutosave(); }),
                 const SizedBox(height: 16),
                 _row(_date(_award,'Award Date'), _field(_awardAmount,'Award Amount (₹)', numeric: true)),

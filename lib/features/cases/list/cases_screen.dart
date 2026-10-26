@@ -101,15 +101,52 @@ class _CasesScreenState extends State<CasesScreen> {
     }
   }
 
+  Future<void> _deleteSelectedArchived() async {
+    if (!archived || _selectedIds.isEmpty) return;
+    final ids = _selectedIds.toList();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Permanently delete ${ids.length} archived case${ids.length == 1 ? '' : 's'}?'),
+        content: const Text('This cannot be undone. The selected archived cases and their audit history will be deleted, allowing their case numbers to be imported again.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete permanently'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await CaseDatabase.instance.permanentlyDelete(ids);
+      if (!mounted) return;
+      setState(() {
+        _selectedIds.clear();
+        _future = CaseDatabase.instance.allCases(includeArchived: true);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Deleted ${ids.length} archived case${ids.length == 1 ? '' : 's'}.')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not delete archived cases: $e')));
+      }
+    }
+  }
+
   DateTime? _deadlineFor(CaseRecord c) {
+    final received = c.receivedDate;
     switch (widget.stage) {
       case 'police':
-        return c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null
-            ? DeadlineService.addMonths(c.receivedDate, 5)
+        return received != null && c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null
+            ? DeadlineService.addMonths(received, 5)
             : null;
       case 'filing':
-        return c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null && c.policeDocumentsDate != null
-            ? DeadlineService.addMonths(c.receivedDate, 5)
+        return received != null && c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null && c.policeDocumentsDate != null
+            ? DeadlineService.addMonths(received, 5)
             : null;
       case 'deposit':
         return c.awardDate != null && c.depositDate == null && c.executionDepositDate == null
@@ -130,11 +167,11 @@ class _CasesScreenState extends State<CasesScreen> {
         if (c.depositDate != null && c.feesReceivedDate == null) {
           return c.depositDate!.add(const Duration(days: 7));
         }
-        if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
-          return DeadlineService.addMonths(c.receivedDate, 5);
+        if (received != null && c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
+          return DeadlineService.addMonths(received, 5);
         }
-        if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
-          return DeadlineService.addMonths(c.receivedDate, 5);
+        if (received != null && c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
+          return DeadlineService.addMonths(received, 5);
         }
         return null;
     }
@@ -207,11 +244,11 @@ class _CasesScreenState extends State<CasesScreen> {
       return 'Due Soon';
     }
     final start = c.receivedDate;
-    if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
+    if (start != null && c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
       if (!now.isBefore(DeadlineService.addMonths(start, 5))) return 'Overdue';
       if (!now.isBefore(DeadlineService.addMonths(start, 3))) return 'Due Soon';
     }
-    if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
+    if (start != null && c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
       if (!now.isBefore(DeadlineService.addMonths(start, 5))) return 'Overdue';
       if (!now.isBefore(DeadlineService.addMonths(start, 4))) return 'Due Soon';
     }
@@ -250,10 +287,10 @@ class _CasesScreenState extends State<CasesScreen> {
       d = DeadlineService.addMonthsAndDays(c.awardDate!, 2, 15);
     } else if (c.depositDate != null && c.feesReceivedDate == null) {
       d = c.depositDate!.add(const Duration(days: 7));
-        } else if (c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
-      d = DeadlineService.addMonths(c.receivedDate, 3);
-        } else if (c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
-      d = DeadlineService.addMonths(c.receivedDate, 4);
+        } else if (c.receivedDate != null && c.caseNumber?.trim().isEmpty != false && c.policeDocumentsDate == null) {
+      d = DeadlineService.addMonths(c.receivedDate!, 3);
+        } else if (c.receivedDate != null && c.caseNumber?.trim().isEmpty != false && c.caseFiledDate == null) {
+      d = DeadlineService.addMonths(c.receivedDate!, 4);
     }
     if (d == null) return '—';
     final days = DateTime(d.year,d.month,d.day).difference(DateTime.now()).inDays;
@@ -446,6 +483,14 @@ class _CasesScreenState extends State<CasesScreen> {
                     icon: Icon(archived ? Icons.restore : Icons.archive_outlined),
                     label: Text(archived ? 'Restore selected' : 'Archive selected'),
                   ),
+                  if (archived) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: _deleteSelectedArchived,
+                      icon: const Icon(Icons.delete_forever_outlined),
+                      label: const Text('Delete permanently'),
+                    ),
+                  ],
                 ],
               ],
             ),

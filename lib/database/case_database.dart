@@ -24,13 +24,13 @@ class CaseDatabase {
     _database = await databaseFactoryFfi.openDatabase(
       file,
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 5,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE cases (
               id TEXT PRIMARY KEY,
               case_number TEXT,
-              received_date TEXT NOT NULL,
+              received_date TEXT,
               accident_date TEXT,
               client_name TEXT NOT NULL,
               address TEXT NOT NULL DEFAULT '',
@@ -101,6 +101,47 @@ class CaseDatabase {
               case_number TEXT, action TEXT NOT NULL, actor TEXT NOT NULL,
               occurred_at TEXT NOT NULL
             )''');
+          }
+          if (oldVersion < 5) {
+            await db.execute('''
+              CREATE TABLE cases_new (
+                id TEXT PRIMARY KEY,
+                case_number TEXT,
+                received_date TEXT,
+                accident_date TEXT,
+                client_name TEXT NOT NULL,
+                address TEXT NOT NULL DEFAULT '',
+                phone TEXT NOT NULL DEFAULT '',
+                police_station TEXT NOT NULL DEFAULT '',
+                responsible_party TEXT NOT NULL DEFAULT '',
+                police_documents_date TEXT,
+                case_filed_date TEXT,
+                evidence_date TEXT,
+                award_date TEXT,
+                award_type TEXT,
+                award_amount REAL,
+                award_amount_interest_cost REAL,
+                deposit_date TEXT,
+                deposit_amount REAL,
+                fees_received_date TEXT,
+                fees_amount REAL,
+                ep_filed_date TEXT,
+                execution_deposit_date TEXT,
+                execution_deposit_amount REAL,
+                court_filed TEXT NOT NULL DEFAULT '',
+                advocates TEXT NOT NULL DEFAULT '',
+                ep_filing_type TEXT,
+                is_archived INTEGER NOT NULL DEFAULT 0,
+                archived_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+              )
+            ''');
+            await db.execute('INSERT INTO cases_new SELECT * FROM cases');
+            await db.execute('DROP TABLE cases');
+            await db.execute('ALTER TABLE cases_new RENAME TO cases');
+            await db.execute('CREATE INDEX idx_cases_received_date ON cases(received_date)');
+            await db.execute('CREATE INDEX idx_cases_case_number ON cases(case_number)');
           }
         },
       ),
@@ -211,6 +252,17 @@ class CaseDatabase {
           'actor': actor,
           'occurred_at': now,
         });
+      }
+    });
+  }
+
+  Future<void> permanentlyDelete(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = await database;
+    await db.transaction((txn) async {
+      for (final id in ids) {
+        await txn.delete('case_audit', where: 'case_id = ?', whereArgs: [id]);
+        await txn.delete('cases', where: 'id = ? AND is_archived = 1', whereArgs: [id]);
       }
     });
   }

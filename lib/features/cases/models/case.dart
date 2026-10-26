@@ -1,7 +1,7 @@
 class CaseRecord {
   final String id;
   final String? caseNumber;
-  final DateTime receivedDate;
+  final DateTime? receivedDate;
   final DateTime? accidentDate;
   final String clientName;
   final String address;
@@ -66,18 +66,22 @@ class CaseRecord {
   bool get isClosed => depositDate != null && feesReceivedDate != null ||
       executionDepositDate != null;
 
-  int get year => receivedDate.year;
+  int? get year => receivedDate?.year;
 
-  String? get displayCaseNumber => formatCaseNumber(caseNumber, receivedDate.year);
-  static String? formatCaseNumber(String? value, int receivedYear) {
+  String? get displayCaseNumber => formatCaseNumber(caseNumber, receivedDate?.year);
+  static String? formatCaseNumber(String? value, int? receivedYear) {
     final s = value?.trim();
     if (s == null || s.isEmpty) return null;
+    final date = RegExp(r'^\d{1,2}/(\d{1,2})/(\d{4})$').firstMatch(s);
+    if (date != null) {
+      return '${date.group(1)!.padLeft(2, '0')}/${date.group(2)!}';
+    }
     final m = RegExp(r'^\s*(\d+)\s*/\s*(\d+)\s*$').firstMatch(s);
     if (m == null) return s;
     final a = m.group(1)!, b = m.group(2)!;
     if (a.length == 4 && b.length == 4) return '$a/$b';
-    if (a.length == 4 && int.tryParse(a) == receivedYear) return '$b/$a';
-    if (b.length == 4 && int.tryParse(b) == receivedYear) return '$a/$b';
+    if (receivedYear != null && a.length == 4 && int.tryParse(a) == receivedYear) return '$b/$a';
+    if (receivedYear != null && b.length == 4 && int.tryParse(b) == receivedYear) return '$a/$b';
     // Historic databases used YEAR/NUMBER; preserve that interpretation for
     // unambiguous four-digit year prefixes.
     if (a.length == 4) return '$b/$a';
@@ -131,8 +135,8 @@ class CaseRecord {
 
   factory CaseRecord.fromMap(Map<String, Object?> m) => CaseRecord(
     id: m['id'] as String,
-    receivedDate: DateTime.parse(m['received_date'] as String),
-    caseNumber: formatCaseNumber(m['case_number'] as String?, DateTime.parse(m['received_date'] as String).year),
+    receivedDate: _parseDate(m['received_date']),
+    caseNumber: formatCaseNumber(m['case_number'] as String?, _parseDate(m['received_date'])?.year),
     accidentDate: _parseDate(m['accident_date']),
     clientName: (m['client_name'] as String?) ?? '',
     address: (m['address'] as String?) ?? '',

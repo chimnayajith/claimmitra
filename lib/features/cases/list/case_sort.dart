@@ -9,8 +9,8 @@ int compareCasesForList(CaseRecord a, CaseRecord b) {
   final bHasNumber = bNumber?.isNotEmpty ?? false;
   final aParts = aHasNumber ? _caseNumberPattern.firstMatch(aNumber!) : null;
   final bParts = bHasNumber ? _caseNumberPattern.firstMatch(bNumber!) : null;
-  final aYear = int.tryParse(aParts?.group(2) ?? '') ?? a.receivedDate.year;
-  final bYear = int.tryParse(bParts?.group(2) ?? '') ?? b.receivedDate.year;
+  final aYear = int.tryParse(aParts?.group(2) ?? '') ?? a.receivedDate?.year ?? 0;
+  final bYear = int.tryParse(bParts?.group(2) ?? '') ?? b.receivedDate?.year ?? 0;
 
   if (aYear != bYear) return bYear.compareTo(aYear);
   if (aHasNumber != bHasNumber) return aHasNumber ? -1 : 1;
@@ -25,7 +25,7 @@ int compareCasesForList(CaseRecord a, CaseRecord b) {
     final numberComparison = aNumber!.compareTo(bNumber!);
     if (numberComparison != 0) return numberComparison;
   } else {
-    final receivedDateComparison = b.receivedDate.compareTo(a.receivedDate);
+    final receivedDateComparison = (b.receivedDate ?? DateTime(1)).compareTo(a.receivedDate ?? DateTime(1));
     if (receivedDateComparison != 0) return receivedDateComparison;
   }
 

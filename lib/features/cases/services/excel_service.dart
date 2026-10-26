@@ -220,23 +220,23 @@ class ExcelService {
 
       try {
         final name = val(row, ['client name', 'name', 'client']);
-        final number = val(row, ['case number', 'case no', 'case no.']).trim();
+        final number = _caseNumberValue(
+          val(row, ['case number', 'case no', 'case no.']),
+        );
         final received = _parseDate(
           val(row, ['case received date', 'received date', 'case received']),
         );
         if (name.isEmpty || (number.isEmpty && received == null)) {
           skipped++;
-          errors.add(number.isEmpty
-              ? 'Row $displayRow: Client Name and a valid Case Received Date are required.'
-              : 'Row $displayRow: Client Name is required.');
+          errors.add(name.isEmpty
+              ? 'Row $displayRow: Client Name is required.'
+              : 'Row $displayRow: A valid Case Received Date is required when Case Number is missing.');
           continue;
         }
 
-        final effectiveReceived = received ??
-            _dateFromCaseNumber(number) ??
-            DateTime(now.year, now.month, now.day);
+        final effectiveReceived = received;
         final normalizedNumber = CaseDatabase.normalizeCaseNumber(
-          CaseRecord.formatCaseNumber(number, effectiveReceived.year),
+          CaseRecord.formatCaseNumber(number, effectiveReceived?.year),
         ) ?? '';
         if (normalizedNumber.isNotEmpty && knownNumbers.contains(normalizedNumber)) {
           skipped++;
@@ -249,7 +249,7 @@ class ExcelService {
 
         records.add(CaseRecord(
           id: 'case_${now.microsecondsSinceEpoch}_${i}_${Random().nextInt(999999)}',
-          caseNumber: number.isEmpty ? null : CaseRecord.formatCaseNumber(number, effectiveReceived.year),
+          caseNumber: number.isEmpty ? null : CaseRecord.formatCaseNumber(number, effectiveReceived?.year),
           receivedDate: effectiveReceived,
           accidentDate: _parseDate(val(row, ['accident date', 'date of accident'])),
           clientName: name.trim(),
@@ -323,6 +323,13 @@ class ExcelService {
 
   static String _formatAmount(double? value) => value == null ? '' : value.toString();
 
+  static String _caseNumberValue(String input) {
+    final value = input.trim();
+    final date = RegExp(r'^\d{1,2}/(\d{1,2})/(\d{4})$').firstMatch(value);
+    if (date == null) return value;
+    return '${date.group(1)!.padLeft(2, '0')}/${date.group(2)!}';
+  }
+
   static DateTime? _parseDate(String input) {
     final s = input.trim();
     if (s.isEmpty) return null;
@@ -356,13 +363,6 @@ class ExcelService {
       );
     }
     return null;
-  }
-
-  static DateTime? _dateFromCaseNumber(String input) {
-    final year = RegExp(r'(?<!\d)(\d{4})(?!\d)').firstMatch(input)?.group(1);
-    final parsedYear = year == null ? null : int.tryParse(year);
-    if (parsedYear == null || parsedYear < 1 || parsedYear > 9999) return null;
-    return DateTime(parsedYear, 1, 1);
   }
 
   static DateTime? _validatedDate(int year, int month, int day) {
