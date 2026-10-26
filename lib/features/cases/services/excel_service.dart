@@ -163,9 +163,7 @@ class ExcelService {
       final candidate = sheet.rows[r].map((c) => normalize(cellText(c))).toList();
       final hasName = candidate.any((h) =>
           {'clientname', 'name', 'client'}.contains(h));
-      final hasReceived = candidate.any((h) =>
-          {'casereceiveddate', 'receiveddate', 'casereceived'}.contains(h));
-      if (hasName && hasReceived) {
+        if (hasName) {
         headerRowIndex = r;
         header = candidate;
         break;
@@ -175,7 +173,8 @@ class ExcelService {
     if (headerRowIndex < 0) {
       throw Exception(
         'Could not find the header row in "$sheetName". The sheet must contain '
-        'both Client Name and Case Received Date columns. Found sheets: '
+        'a Client Name column. Case Received Date is only required when a '
+        'row has no Case Number. Found sheets: '
         '${workbook.tables.keys.join(', ')}.',
       );
     }
@@ -221,20 +220,23 @@ class ExcelService {
 
       try {
         final name = val(row, ['client name', 'name', 'client']);
+        final number = val(row, ['case number', 'case no', 'case no.']).trim();
         final received = _parseDate(
           val(row, ['case received date', 'received date', 'case received']),
         );
-        if (name.isEmpty || received == null) {
+        if (name.isEmpty || (number.isEmpty && received == null)) {
           skipped++;
-          errors.add(
-            'Row $displayRow: Client Name and a valid Case Received Date are required.',
-          );
+          errors.add(number.isEmpty
+              ? 'Row $displayRow: Client Name and a valid Case Received Date are required.'
+              : 'Row $displayRow: Client Name is required.');
           continue;
         }
 
-        final number = val(row, ['case number', 'case no', 'case no.']).trim();
+        final effectiveReceived = received ??
+            _dateFromCaseNumber(number) ??
+            DateTime(now.year, now.month, now.day);
         final normalizedNumber = CaseDatabase.normalizeCaseNumber(
-          CaseRecord.formatCaseNumber(number, received.year),
+          CaseRecord.formatCaseNumber(number, effectiveReceived.year),
         ) ?? '';
         if (normalizedNumber.isNotEmpty && knownNumbers.contains(normalizedNumber)) {
           skipped++;
@@ -247,8 +249,8 @@ class ExcelService {
 
         records.add(CaseRecord(
           id: 'case_${now.microsecondsSinceEpoch}_${i}_${Random().nextInt(999999)}',
-          caseNumber: number.isEmpty ? null : CaseRecord.formatCaseNumber(number, received.year),
-          receivedDate: received,
+          caseNumber: number.isEmpty ? null : CaseRecord.formatCaseNumber(number, effectiveReceived.year),
+          receivedDate: effectiveReceived,
           accidentDate: _parseDate(val(row, ['accident date', 'date of accident'])),
           clientName: name.trim(),
           address: val(row, ['address']),
@@ -311,8 +313,9 @@ class ExcelService {
     return ExcelImportResult(records, skipped, errors);
   }
 
-  static Future<void> commitImport(ExcelImportResult result) =>
-      CaseDatabase.instance.saveMany(result.records);
+  static Future<int> commitImport(ExcelImportResult result) async {
+    return CaseDatabase.instance.saveMany(result.records);
+  }
 
   static String _format(DateTime? date) => date == null
       ? ''
@@ -353,6 +356,13 @@ class ExcelService {
       );
     }
     return null;
+  }
+
+  static DateTime? _dateFromCaseNumber(String input) {
+    final year = RegExp(r'(?<!\d)(\d{4})(?!\d)').firstMatch(input)?.group(1);
+    final parsedYear = year == null ? null : int.tryParse(year);
+    if (parsedYear == null || parsedYear < 1 || parsedYear > 9999) return null;
+    return DateTime(parsedYear, 1, 1);
   }
 
   static DateTime? _validatedDate(int year, int month, int day) {

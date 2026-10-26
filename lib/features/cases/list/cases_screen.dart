@@ -280,7 +280,7 @@ class _CasesScreenState extends State<CasesScreen> {
                   Text('${preview.imported} valid rows ready to import.'),
                   Text('${preview.skipped} rows will be skipped.'),
                   const SizedBox(height: 12),
-                  const Text('Required columns: Client Name and Case Received Date. Existing case numbers are skipped.'),
+                  const Text('Required column: Client Name. Case Received Date is required only when Case Number is empty. Existing case numbers are skipped.'),
                   if (detail.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     const Text('Validation issues:', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -299,9 +299,10 @@ class _CasesScreenState extends State<CasesScreen> {
         ),
       );
       if (confirmed != true || !mounted) return;
-      await ExcelService.commitImport(preview);
+      final imported = await ExcelService.commitImport(preview);
       _refresh();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Imported ${preview.imported} cases; skipped ${preview.skipped} rows.')));
+      final skipped = preview.skipped + preview.imported - imported;
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Imported $imported cases; skipped $skipped rows.')));
     } catch (e, stackTrace) {
       debugPrint('Excel import failed: $e');
       debugPrintStack(stackTrace: stackTrace);
@@ -309,7 +310,9 @@ class _CasesScreenState extends State<CasesScreen> {
       if (mounted) {
         final message = e is FormatException
             ? e.message
-            : 'Import failed. Please verify that the file is a valid .xlsx workbook.';
+            : e is DuplicateCaseNumberException
+                ? 'Import could not be saved: ${e.caseNumber} already exists.'
+                : 'Import could not be saved: $e';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
 

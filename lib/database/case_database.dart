@@ -126,8 +126,10 @@ class CaseDatabase {
     await db.insert('cases', record.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<void> saveMany(List<CaseRecord> records) async {
+  Future<int> saveMany(List<CaseRecord> records) async {
+    if (records.isEmpty) return 0;
     final db = await database;
+    var saved = 0;
     await db.transaction((txn) async {
       final usedNumbers = <String, String>{};
       final existing = await txn.query('cases', columns: ['id', 'case_number']);
@@ -140,15 +142,15 @@ class CaseDatabase {
         final number = normalizeCaseNumber(record.caseNumber);
         if (number != null) {
           final existingId = usedNumbers[number];
-          if (existingId != null && existingId != record.id) {
-            throw DuplicateCaseNumberException(record.caseNumber!.trim());
-          }
+          if (existingId != null && existingId != record.id) continue;
           usedNumbers[number] = record.id;
         }
-        batch.insert('cases', record.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
+        batch.insert('cases', record.toMap(), conflictAlgorithm: ConflictAlgorithm.abort);
+        saved++;
       }
       await batch.commit(noResult: true);
     });
+    return saved;
   }
 
   Future<void> _ensureCaseNumberAvailable(Database db, CaseRecord record) async {

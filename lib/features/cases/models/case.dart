@@ -123,7 +123,7 @@ class CaseRecord {
     'fees_amount': feesAmount, 'ep_filed_date': _date(epFiledDate),
     'execution_deposit_date': _date(executionDepositDate),
     'execution_deposit_amount': executionDepositAmount,
-    'court_filed': _clean(courtFiled), 'advocates': _clean(normalizeAdvocates(advocates)),
+    'court_filed': courtFiled.trim(), 'advocates': normalizeAdvocates(advocates),
     'ep_filing_type': epFilingType ?? (epFiledDate == null ? null : 'EP'),
     'is_archived': isArchived ? 1 : 0, 'archived_at': _date(archivedAt),
     'created_at': createdAt.toIso8601String(), 'updated_at': updatedAt.toIso8601String(),
