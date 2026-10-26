@@ -1,7 +1,7 @@
 name: claimmitra
 description: ClaimMitra - Insurance claim case management.
 publish_to: 'none'
-version: 1.0.6+8
+version: 5.0.7+8
 environment:
   sdk: ^3.10.1
 dependencies:
