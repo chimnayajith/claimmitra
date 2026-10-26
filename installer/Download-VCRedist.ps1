@@ -24,6 +24,12 @@ if ($signature.Status -ne 'Valid' -or
     throw "Downloaded redistributable does not have a valid Microsoft signature (status: $($signature.Status))."
 }
 
+$fileVersion = (Get-Item $output).VersionInfo
+if ($fileVersion.OriginalFilename -ne 'VC_redist.x64.exe' -or
+    $fileVersion.ProductName -notmatch '\(x64\)') {
+    throw "Downloaded package metadata does not identify Microsoft's x64 redistributable (original filename: '$($fileVersion.OriginalFilename)', product: '$($fileVersion.ProductName)')."
+}
+
 $stream = [System.IO.File]::OpenRead($output)
 try {
     $reader = [System.IO.BinaryReader]::new($stream)
@@ -40,12 +46,12 @@ try {
         throw 'Downloaded redistributable is not a valid PE executable.'
     }
     $machine = $reader.ReadUInt16()
-    if ($machine -ne 0x8664) {
-        throw ('Expected an x64 redistributable (PE machine 0x8664), got 0x{0:X4}.' -f $machine)
+    if ($machine -notin @(0x014C, 0x8664)) {
+        throw ('Downloaded redistributable has an unsupported PE bootstrapper architecture (machine 0x{0:X4}).' -f $machine)
     }
 }
 finally {
     $stream.Dispose()
 }
 
-Write-Host "Validated signed Microsoft x64 Visual C++ Redistributable: $output"
+Write-Host "Validated signed Microsoft x64 Visual C++ Redistributable package: $output"
