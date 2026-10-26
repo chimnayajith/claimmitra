@@ -73,6 +73,25 @@ jobs:
           if (!$env:SUPABASE_URL -or !$env:SUPABASE_ANON_KEY -or !$env:LICENSE_PUBLIC_KEY_B64) { throw 'Configure SUPABASE_URL, SUPABASE_ANON_KEY, and LICENSE_PUBLIC_KEY_B64 repository secrets.' }
           flutter build windows --release --dart-define="SUPABASE_URL=$env:SUPABASE_URL" --dart-define="SUPABASE_ANON_KEY=$env:SUPABASE_ANON_KEY" --dart-define="LICENSE_PUBLIC_KEY_B64=$env:LICENSE_PUBLIC_KEY_B64" --dart-define="APP_VERSION=$env:APP_VERSION"
 
+      - name: Inspect x64 native runtime dependencies
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $dumpbin = & $vswhere -latest -products '*' -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe' | Select-Object -First 1
+          if (!$dumpbin -or !(Test-Path $dumpbin)) { throw 'Could not locate the Visual Studio x64 dumpbin tool.' }
+          $release = 'build/windows/x64/runner/Release'
+          foreach ($binary in Get-ChildItem $release -Recurse -File | Where-Object { $_.Extension -in '.exe', '.dll' }) {
+            Write-Host "Native imports for $($binary.FullName)"
+            & $dumpbin /nologo /dependents $binary.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Could not inspect native dependencies for $($binary.FullName)." }
+          }
+
+      - name: Download and validate x64 Visual C++ Redistributable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path 'dist' | Out-Null
+          & 'installer/Download-VCRedist.ps1'
+
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
 

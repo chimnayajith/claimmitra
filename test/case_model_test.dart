@@ -67,8 +67,8 @@ void main() {
   });
 
   test('update checker compares dotted versions numerically', () {
-    expect(UpdateService.isNewerVersion('1.0.5', '1.0.4'), isTrue);
-    expect(UpdateService.isNewerVersion('1.0.4', '1.0.5'), isFalse);
-    expect(UpdateService.isNewerVersion('1.0.5', '1.0.5'), isFalse);
+    expect(UpdateService.isNewerVersion('1.0.6', '1.0.4'), isTrue);
+    expect(UpdateService.isNewerVersion('1.0.4', '1.0.6'), isFalse);
+    expect(UpdateService.isNewerVersion('1.0.6', '1.0.6'), isFalse);
   });
 }
