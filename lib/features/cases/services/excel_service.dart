@@ -9,12 +9,52 @@ import '../models/case.dart';
 
 class ExcelImportResult {
   final List<CaseRecord> records;
-  final int skipped;
-  final List<String> errors;
+  int skipped;
+  List<String> errors;
+  final List<ExcelInvalidRow> invalidRows;
 
-  const ExcelImportResult(this.records, this.skipped, this.errors);
+  ExcelImportResult(
+    this.records,
+    this.skipped,
+    this.errors, [
+    this.invalidRows = const [],
+  ]);
 
   int get imported => records.length;
+}
+
+class ExcelInvalidRow {
+  final int sourceRow;
+  CaseRecord record;
+  List<String> problems;
+
+  ExcelInvalidRow({
+    required this.sourceRow,
+    required this.record,
+    required this.problems,
+  });
+
+  String get clientName => record.clientName;
+  String get caseNumber => record.caseNumber ?? '';
+  String get receivedDate => record.receivedDate == null
+      ? ''
+      : ExcelService.formatDate(record.receivedDate!);
+
+  void update({
+    required String clientName,
+    required String caseNumber,
+    required String receivedDate,
+  }) {
+    final parsedReceivedDate = ExcelService.parseDate(receivedDate);
+    record = record.copyWith(
+      clientName: clientName.trim(),
+      caseNumber: caseNumber.trim().isEmpty
+          ? null
+          : ExcelService.caseNumberValue(caseNumber),
+      clearCaseNumber: caseNumber.trim().isEmpty,
+      receivedDate: parsedReceivedDate,
+    );
+  }
 }
 
 class ExcelService {
@@ -121,8 +161,11 @@ class ExcelService {
     if (picked == null || picked.files.isEmpty) return null;
 
     final selected = picked.files.first;
-    final bytes = selected.bytes ??
-        (selected.path == null ? null : await File(selected.path!).readAsBytes());
+    final bytes =
+        selected.bytes ??
+        (selected.path == null
+            ? null
+            : await File(selected.path!).readAsBytes());
     if (bytes == null) {
       throw Exception('Could not read the selected Excel file.');
     }
@@ -147,7 +190,8 @@ class ExcelService {
         ? 'Cases'
         : workbook.tables.keys.first;
     final sheet = workbook.tables[sheetName];
-    if (sheet == null) throw Exception('Could not read worksheet "$sheetName".');
+    if (sheet == null)
+      throw Exception('Could not read worksheet "$sheetName".');
     if (sheet.rows.isEmpty) throw Exception('Worksheet "$sheetName" is empty.');
 
     String normalize(String value) => value
@@ -160,10 +204,13 @@ class ExcelService {
     var headerRowIndex = -1;
     List<String> header = const [];
     for (var r = 0; r < sheet.rows.length; r++) {
-      final candidate = sheet.rows[r].map((c) => normalize(cellText(c))).toList();
-      final hasName = candidate.any((h) =>
-          {'clientname', 'name', 'client'}.contains(h));
-        if (hasName) {
+      final candidate = sheet.rows[r]
+          .map((c) => normalize(cellText(c)))
+          .toList();
+      final hasName = candidate.any(
+        (h) => {'clientname', 'name', 'client'}.contains(h),
+      );
+      if (hasName) {
         headerRowIndex = r;
         header = candidate;
         break;
@@ -202,7 +249,9 @@ class ExcelService {
       return double.tryParse(s);
     }
 
-    final existing = await CaseDatabase.instance.allCases(includeArchived: true);
+    final existing = await CaseDatabase.instance.allCases(
+      includeArchived: true,
+    );
     final knownNumbers = existing
         .map((c) => CaseDatabase.normalizeCaseNumber(c.displayCaseNumber))
         .whereType<String>()
@@ -210,6 +259,7 @@ class ExcelService {
         .toSet();
     final records = <CaseRecord>[];
     final errors = <String>[];
+    final invalidRows = <ExcelInvalidRow>[];
     var skipped = 0;
     final now = DateTime.now();
 
@@ -226,32 +276,25 @@ class ExcelService {
         final received = _parseDate(
           val(row, ['case received date', 'received date', 'case received']),
         );
-        if (name.isEmpty || (number.isEmpty && received == null)) {
-          skipped++;
-          errors.add(name.isEmpty
-              ? 'Row $displayRow: Client Name is required.'
-              : 'Row $displayRow: A valid Case Received Date is required when Case Number is missing.');
-          continue;
-        }
-
         final effectiveReceived = received;
-        final normalizedNumber = CaseDatabase.normalizeCaseNumber(
-          CaseRecord.formatCaseNumber(number, effectiveReceived?.year),
-        ) ?? '';
-        if (normalizedNumber.isNotEmpty && knownNumbers.contains(normalizedNumber)) {
-          skipped++;
-          errors.add('Row $displayRow: Case number "$number" already exists; skipped.');
-          continue;
-        }
+        final normalizedNumber =
+            CaseDatabase.normalizeCaseNumber(
+              CaseRecord.formatCaseNumber(number, effectiveReceived?.year),
+            ) ??
+            '';
 
         String optional(List<String> aliases) => val(row, aliases).trim();
         final awardType = optional(['award type']);
 
-        records.add(CaseRecord(
+        final candidate = CaseRecord(
           id: 'case_${now.microsecondsSinceEpoch}_${i}_${Random().nextInt(999999)}',
-          caseNumber: number.isEmpty ? null : CaseRecord.formatCaseNumber(number, effectiveReceived?.year),
+          caseNumber: number.isEmpty
+              ? null
+              : CaseRecord.formatCaseNumber(number, effectiveReceived?.year),
           receivedDate: effectiveReceived,
-          accidentDate: _parseDate(val(row, ['accident date', 'date of accident'])),
+          accidentDate: _parseDate(
+            val(row, ['accident date', 'date of accident']),
+          ),
           clientName: name.trim(),
           address: val(row, ['address']),
           phone: val(row, ['phone', 'phone number', 'mobile', 'mobile number']),
@@ -264,44 +307,92 @@ class ExcelService {
             'responsible person',
           ]),
           courtFiled: optional(['court filed', 'court']),
-          advocates: CaseRecord.normalizeAdvocates(optional(['advocates', 'advocate'])),
-          policeDocumentsDate: _parseDate(val(row, [
-            'police documents date',
-            'police documents received date',
-            'documents received date',
-          ])),
-          caseFiledDate: _parseDate(val(row, ['case filed date', 'filing date'])),
+          advocates: CaseRecord.normalizeAdvocates(
+            optional(['advocates', 'advocate']),
+          ),
+          policeDocumentsDate: _parseDate(
+            val(row, [
+              'police documents date',
+              'police documents received date',
+              'documents received date',
+            ]),
+          ),
+          caseFiledDate: _parseDate(
+            val(row, ['case filed date', 'filing date']),
+          ),
           evidenceDate: _parseDate(val(row, ['evidence date'])),
           awardDate: _parseDate(val(row, ['award date'])),
           awardType: awardType.isEmpty ? null : awardType,
           awardAmount: amount(val(row, ['award amount'])),
-          awardAmountInterestCost: amount(val(row, [
-            'award amount + interest and cost',
-            'award amount interest and cost',
-            'award amount + interest & cost',
-          ])),
+          awardAmountInterestCost: amount(
+            val(row, [
+              'award amount + interest and cost',
+              'award amount interest and cost',
+              'award amount + interest & cost',
+            ]),
+          ),
           depositDate: _parseDate(val(row, ['deposit date'])),
           depositAmount: amount(val(row, ['deposit amount'])),
-          feesReceivedDate: _parseDate(val(row, ['fees received date', 'fees date'])),
+          feesReceivedDate: _parseDate(
+            val(row, ['fees received date', 'fees date']),
+          ),
           feesAmount: amount(val(row, ['fees amount'])),
-          epFiledDate: _parseDate(val(row, ['ep filed date', 'ep filing date'])),
+          epFiledDate: _parseDate(
+            val(row, ['ep filed date', 'ep filing date']),
+          ),
           epFilingType: (() {
-            final type = optional(['ep/rr filing type', 'filing type']).toUpperCase();
+            final type = optional([
+              'ep/rr filing type',
+              'filing type',
+            ]).toUpperCase();
             if (type.startsWith('RR')) return 'RR';
             if (type.startsWith('EP')) return 'EP';
-            return _parseDate(val(row, ['ep filed date', 'ep filing date'])) == null ? null : 'EP';
+            return _parseDate(val(row, ['ep filed date', 'ep filing date'])) ==
+                    null
+                ? null
+                : 'EP';
           })(),
-          executionDepositDate: _parseDate(val(row, [
-            'deposit against execution date',
-            'execution deposit date',
-          ])),
-          executionDepositAmount: amount(val(row, [
-            'deposit against execution amount',
-            'execution deposit amount',
-          ])),
+          executionDepositDate: _parseDate(
+            val(row, [
+              'deposit against execution date',
+              'execution deposit date',
+            ]),
+          ),
+          executionDepositAmount: amount(
+            val(row, [
+              'deposit against execution amount',
+              'execution deposit amount',
+            ]),
+          ),
           createdAt: now,
           updatedAt: now,
-        ));
+        );
+
+        final problems = <String>[];
+        if (name.isEmpty) problems.add('Client Name is required.');
+        if (number.isEmpty && received == null) {
+          problems.add(
+            'A valid Case Received Date is required when Case Number is missing.',
+          );
+        }
+        if (normalizedNumber.isNotEmpty &&
+            knownNumbers.contains(normalizedNumber)) {
+          problems.add('Case number "$number" already exists.');
+        }
+        if (problems.isNotEmpty) {
+          skipped++;
+          invalidRows.add(
+            ExcelInvalidRow(
+              sourceRow: displayRow,
+              record: candidate,
+              problems: problems,
+            ),
+          );
+          errors.addAll(problems.map((problem) => 'Row $displayRow: $problem'));
+          continue;
+        }
+
+        records.add(candidate);
 
         if (normalizedNumber.isNotEmpty) knownNumbers.add(normalizedNumber);
       } catch (e) {
@@ -310,18 +401,88 @@ class ExcelService {
       }
     }
 
-    return ExcelImportResult(records, skipped, errors);
+    return ExcelImportResult(records, skipped, errors, invalidRows);
+  }
+
+  static Future<void> revalidate(ExcelImportResult result) async {
+    final existing = await CaseDatabase.instance.allCases(
+      includeArchived: true,
+    );
+    final knownNumbers = existing
+        .map((c) => CaseDatabase.normalizeCaseNumber(c.displayCaseNumber))
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .toSet();
+    for (final record in result.records) {
+      final normalized = CaseDatabase.normalizeCaseNumber(
+        record.displayCaseNumber,
+      );
+      if (normalized != null) knownNumbers.add(normalized);
+    }
+
+    final remaining = <ExcelInvalidRow>[];
+    final errors = <String>[];
+    for (final row in result.invalidRows) {
+      final problems = <String>[];
+      final number = _caseNumberValue(row.caseNumber);
+      final received = _parseDate(row.receivedDate);
+      final normalizedNumber =
+          CaseDatabase.normalizeCaseNumber(
+            CaseRecord.formatCaseNumber(number, received?.year),
+          ) ??
+          '';
+      if (row.clientName.trim().isEmpty)
+        problems.add('Client Name is required.');
+      if (number.isEmpty && received == null) {
+        problems.add(
+          'A valid Case Received Date is required when Case Number is missing.',
+        );
+      }
+      if (normalizedNumber.isNotEmpty &&
+          knownNumbers.contains(normalizedNumber)) {
+        problems.add('Case number "$number" already exists.');
+      }
+      row.problems = problems;
+      if (problems.isEmpty) {
+        row.record = row.record.copyWith(
+          caseNumber: number.isEmpty
+              ? null
+              : CaseRecord.formatCaseNumber(number, received?.year),
+          clearCaseNumber: number.isEmpty,
+          receivedDate: received,
+        );
+        result.records.add(row.record);
+        if (normalizedNumber.isNotEmpty) knownNumbers.add(normalizedNumber);
+      } else {
+        remaining.add(row);
+        errors.addAll(
+          problems.map((problem) => 'Row ${row.sourceRow}: $problem'),
+        );
+      }
+    }
+    result.invalidRows
+      ..clear()
+      ..addAll(remaining);
+    result.errors = errors;
+    result.skipped = remaining.length;
   }
 
   static Future<int> commitImport(ExcelImportResult result) async {
     return CaseDatabase.instance.saveMany(result.records);
   }
 
+  static String formatDate(DateTime date) => _format(date);
+
+  static DateTime? parseDate(String input) => _parseDate(input);
+
+  static String caseNumberValue(String input) => _caseNumberValue(input);
+
   static String _format(DateTime? date) => date == null
       ? ''
       : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 
-  static String _formatAmount(double? value) => value == null ? '' : value.toString();
+  static String _formatAmount(double? value) =>
+      value == null ? '' : value.toString();
 
   static String _caseNumberValue(String input) {
     final value = input.trim();
@@ -345,7 +506,9 @@ class ExcelService {
     final iso = DateTime.tryParse(s);
     if (iso != null) return DateTime(iso.year, iso.month, iso.day);
 
-    final yearFirst = RegExp(r'^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$').firstMatch(s);
+    final yearFirst = RegExp(
+      r'^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$',
+    ).firstMatch(s);
     if (yearFirst != null) {
       return _validatedDate(
         int.parse(yearFirst.group(1)!),
@@ -354,7 +517,9 @@ class ExcelService {
       );
     }
 
-    final dayFirst = RegExp(r'^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$').firstMatch(s);
+    final dayFirst = RegExp(
+      r'^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$',
+    ).firstMatch(s);
     if (dayFirst != null) {
       return _validatedDate(
         int.parse(dayFirst.group(3)!),
@@ -368,7 +533,8 @@ class ExcelService {
   static DateTime? _validatedDate(int year, int month, int day) {
     if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31) return null;
     final date = DateTime(year, month, day);
-    if (date.year != year || date.month != month || date.day != day) return null;
+    if (date.year != year || date.month != month || date.day != day)
+      return null;
     return DateTime(date.year, date.month, date.day);
   }
 }
