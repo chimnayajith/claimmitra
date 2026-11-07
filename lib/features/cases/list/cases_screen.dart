@@ -66,7 +66,9 @@ class _CasesScreenState extends State<CasesScreen> {
 
   Future<void> _processSelected() async {
     final ids = _selectedIds.toList();
-    if (ids.isEmpty) return;
+    if (ids.isEmpty) {
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -93,10 +95,14 @@ class _CasesScreenState extends State<CasesScreen> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted) {
+      return;
+    }
     try {
       await CaseDatabase.instance.setArchived(ids, archived: !archived);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _selectedIds.clear();
         _future = CaseDatabase.instance.allCases(includeArchived: true);
@@ -122,7 +128,9 @@ class _CasesScreenState extends State<CasesScreen> {
   }
 
   Future<void> _deleteSelectedArchived() async {
-    if (!archived || _selectedIds.isEmpty) return;
+    if (!archived || _selectedIds.isEmpty) {
+      return;
+    }
     final ids = _selectedIds.toList();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -146,10 +154,14 @@ class _CasesScreenState extends State<CasesScreen> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted) {
+      return;
+    }
     try {
       await CaseDatabase.instance.permanentlyDelete(ids);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _selectedIds.clear();
         _future = CaseDatabase.instance.allCases(includeArchived: true);
@@ -257,7 +269,9 @@ class _CasesScreenState extends State<CasesScreen> {
 
   bool _matchesPreset(CaseRecord c) {
     if (widget.stage != null) {
-      if (c.isClosed) return false;
+      if (c.isClosed) {
+        return false;
+      }
       switch (widget.stage) {
         case 'police':
           return c.caseNumber?.trim().isEmpty != false &&
@@ -299,54 +313,86 @@ class _CasesScreenState extends State<CasesScreen> {
   }
 
   String _stage(CaseRecord c) {
-    if (c.isClosed) return 'Closed';
-    if (c.executionDepositDate != null) return 'Deposit Against Execution';
-    if (c.epFiledDate != null)
+    if (c.isClosed) {
+      return 'Closed';
+    }
+    if (c.executionDepositDate != null) {
+      return 'Deposit Against Execution';
+    }
+    if (c.epFiledDate != null) {
       return c.epFilingType == 'RR' ? 'RR Filing' : 'EP Filing';
-    if (c.feesReceivedDate != null) return 'Fees Received';
-    if (c.depositDate != null) return 'Fees Received';
-    if (c.awardDate != null) return 'Deposit';
-    if (c.evidenceDate != null) return 'Award';
-    if (c.caseFiledDate != null || c.caseNumber?.trim().isNotEmpty == true)
+    }
+    if (c.feesReceivedDate != null) {
+      return 'Fees Received';
+    }
+    if (c.depositDate != null) {
+      return 'Fees Received';
+    }
+    if (c.awardDate != null) {
+      return 'Deposit';
+    }
+    if (c.evidenceDate != null) {
+      return 'Award';
+    }
+    if (c.caseFiledDate != null || c.caseNumber?.trim().isNotEmpty == true) {
       return 'Evidence';
-    if (c.policeDocumentsDate != null) return 'Case Filed';
+    }
+    if (c.policeDocumentsDate != null) {
+      return 'Case Filed';
+    }
     return 'Police Documents';
   }
 
   String _status(CaseRecord c) {
-    if (c.isClosed) return 'Completed';
+    if (c.isClosed) {
+      return 'Completed';
+    }
     final now = DateTime.now();
     if (c.awardDate != null && c.depositDate == null) {
-      if (!now.isBefore(DeadlineService.addMonths(c.awardDate!, 4)))
+      if (!now.isBefore(DeadlineService.addMonths(c.awardDate!, 4))) {
         return 'Overdue';
+      }
     }
     if (c.awardDate != null && c.depositDate == null) {
       final d = DeadlineService.addMonthsAndDays(c.awardDate!, 2, 15);
-      if (!now.isBefore(d)) return 'Due Soon';
+      if (!now.isBefore(d)) {
+        return 'Due Soon';
+      }
     }
     if (c.depositDate != null && c.feesReceivedDate == null) {
-      if (!now.isBefore(c.depositDate!.add(const Duration(days: 7))))
+      if (!now.isBefore(c.depositDate!.add(const Duration(days: 7)))) {
         return 'Overdue';
+      }
       return 'Due Soon';
     }
     final start = c.receivedDate;
     if (start != null &&
         c.caseNumber?.trim().isEmpty != false &&
         c.policeDocumentsDate == null) {
-      if (!now.isBefore(DeadlineService.addMonths(start, 5))) return 'Overdue';
-      if (!now.isBefore(DeadlineService.addMonths(start, 3))) return 'Due Soon';
+      if (!now.isBefore(DeadlineService.addMonths(start, 5))) {
+        return 'Overdue';
+      }
+      if (!now.isBefore(DeadlineService.addMonths(start, 3))) {
+        return 'Due Soon';
+      }
     }
     if (start != null &&
         c.caseNumber?.trim().isEmpty != false &&
         c.caseFiledDate == null) {
-      if (!now.isBefore(DeadlineService.addMonths(start, 5))) return 'Overdue';
-      if (!now.isBefore(DeadlineService.addMonths(start, 4))) return 'Due Soon';
+      if (!now.isBefore(DeadlineService.addMonths(start, 5))) {
+        return 'Overdue';
+      }
+      if (!now.isBefore(DeadlineService.addMonths(start, 4))) {
+        return 'Due Soon';
+      }
     }
     return 'Healthy';
   }
 
   bool _matchesSearch(CaseRecord c, String query, String caseNumberQuery) {
-    if (query.isEmpty) return true;
+    if (query.isEmpty) {
+      return true;
+    }
     final matchesClient = c.clientName.toLowerCase().contains(query);
     final matchesAdvocate = CaseRecord.matchesAdvocateQuery(c.advocates, query);
     switch (_searchScope) {
@@ -374,7 +420,9 @@ class _CasesScreenState extends State<CasesScreen> {
 
   String _due(CaseRecord c) {
     DateTime? d;
-    if (c.isClosed) return '—';
+    if (c.isClosed) {
+      return '—';
+    }
     if (c.awardDate != null && c.depositDate == null) {
       d = DeadlineService.addMonthsAndDays(c.awardDate!, 2, 15);
     } else if (c.depositDate != null && c.feesReceivedDate == null) {
@@ -388,34 +436,43 @@ class _CasesScreenState extends State<CasesScreen> {
         c.caseFiledDate == null) {
       d = DeadlineService.addMonths(c.receivedDate!, 4);
     }
-    if (d == null) return '—';
+    if (d == null) {
+      return '—';
+    }
     final days = DateTime(
       d.year,
       d.month,
       d.day,
     ).difference(DateTime.now()).inDays;
-    if (days < 0) return 'Overdue ${-days}d';
+    if (days < 0) {
+      return 'Overdue ${-days}d';
+    }
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
   Future<void> _import() async {
     try {
       final preview = await ExcelService.importCases();
-      if (!mounted || preview == null) return;
+      if (!mounted || preview == null) {
+        return;
+      }
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => _ExcelImportDialog(preview: preview),
       );
-      if (confirmed != true || !mounted) return;
+      if (confirmed != true || !mounted) {
+        return;
+      }
       final imported = await ExcelService.commitImport(preview);
       _refresh();
       final skipped = preview.skipped + preview.imported - imported;
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Imported $imported cases; skipped $skipped rows.'),
           ),
         );
+      }
     } catch (e, stackTrace) {
       debugPrint('Excel import failed: $e');
       debugPrintStack(stackTrace: stackTrace);
@@ -439,7 +496,7 @@ class _CasesScreenState extends State<CasesScreen> {
         includeArchived: true,
       )).where((c) => archived || !c.isArchived).toList();
       final path = await ExcelService.exportCases(records);
-      if (mounted && path != null)
+      if (mounted && path != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -447,11 +504,13 @@ class _CasesScreenState extends State<CasesScreen> {
             ),
           ),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
     }
   }
 
@@ -474,7 +533,9 @@ class _CasesScreenState extends State<CasesScreen> {
             final caseNumberQuery = q.replaceAll(RegExp(r'\s+'), '');
             final cases =
                 all.where((c) {
-                  if (c.isArchived != archived) return false;
+                  if (c.isArchived != archived) {
+                    return false;
+                  }
                   final status = _status(c);
                   final matchesPreset = _matchesPreset(c);
                   final matchesQuery = _matchesSearch(c, q, caseNumberQuery);
@@ -491,8 +552,12 @@ class _CasesScreenState extends State<CasesScreen> {
                     final ad = _deadlineFor(a);
                     final bd = _deadlineFor(b);
                     if (ad != null && bd != null) return ad.compareTo(bd);
-                    if (ad != null) return -1;
-                    if (bd != null) return 1;
+                    if (ad != null) {
+                      return -1;
+                    }
+                    if (bd != null) {
+                      return 1;
+                    }
                   }
                   return compareCasesForList(a, b);
                 });
@@ -587,8 +652,9 @@ class _CasesScreenState extends State<CasesScreen> {
                           ),
                         ],
                         onChanged: (scope) {
-                          if (scope != null)
+                          if (scope != null) {
                             setState(() => _searchScope = scope);
+                          }
                         },
                       ),
                     ],

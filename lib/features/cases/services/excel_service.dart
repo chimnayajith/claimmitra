@@ -96,7 +96,9 @@ class ExcelService {
   ];
 
   static String cellText(Data? cell) {
-    if (cell == null || cell.value == null) return '';
+    if (cell == null || cell.value == null) {
+      return '';
+    }
     final value = cell.value;
     return switch (value) {
       TextCellValue() => value.value.toString().trim(),
@@ -146,7 +148,9 @@ class ExcelService {
     }
 
     final bytes = excel.save();
-    if (bytes == null) return null;
+    if (bytes == null) {
+      return null;
+    }
 
     final path = await FilePicker.platform.saveFile(
       dialogTitle: 'Export ClaimMitra cases',
@@ -165,7 +169,9 @@ class ExcelService {
       allowedExtensions: ['xlsx'],
       withData: true,
     );
-    if (picked == null || picked.files.isEmpty) return null;
+    if (picked == null || picked.files.isEmpty) {
+      return null;
+    }
 
     final selected = picked.files.first;
     final bytes =
@@ -197,8 +203,9 @@ class ExcelService {
         ? 'Cases'
         : workbook.tables.keys.first;
     final sheet = workbook.tables[sheetName];
-    if (sheet == null)
+    if (sheet == null) {
       throw Exception('Could not read worksheet "$sheetName".');
+    }
     if (sheet.rows.isEmpty) throw Exception('Worksheet "$sheetName" is empty.');
 
     String normalize(String value) => value
@@ -240,13 +247,17 @@ class ExcelService {
 
     String val(List<Data?> row, List<String> names) {
       final index = col(names);
-      if (index < 0 || index >= row.length) return '';
+      if (index < 0 || index >= row.length) {
+        return '';
+      }
       return cellText(row[index]).trim();
     }
 
     double? amount(String input) {
       var s = input.trim();
-      if (s.isEmpty) return null;
+      if (s.isEmpty) {
+        return null;
+      }
       // Supports ₹250,000.00, Rs. 250000, commas and accounting parentheses.
       final negative = s.startsWith('(') && s.endsWith(')');
       s = s.replaceAll(RegExp(r'[₹,\s]'), '');
@@ -381,7 +392,9 @@ class ExcelService {
         );
 
         final problems = <String>[];
-        if (name.isEmpty) problems.add('Client Name is required.');
+        if (name.isEmpty) {
+          problems.add('Client Name is required.');
+        }
         if (number.isEmpty && received == null) {
           problems.add(
             'A valid Case Received Date is required when Case Number is missing.',
@@ -468,8 +481,9 @@ class ExcelService {
             CaseRecord.formatCaseNumber(number, received?.year),
           ) ??
           '';
-      if (row.clientName.trim().isEmpty)
+      if (row.clientName.trim().isEmpty) {
         problems.add('Client Name is required.');
+      }
       if (number.isEmpty && received == null) {
         problems.add(
           'A valid Case Received Date is required when Case Number is missing.',
@@ -529,12 +543,16 @@ class ExcelService {
   static String caseNumberValue(String input) => _caseNumberValue(input);
 
   static String? _noNumberIdentity(CaseRecord record) {
-    if (record.displayCaseNumber?.trim().isNotEmpty ?? false) return null;
+    if (record.displayCaseNumber?.trim().isNotEmpty ?? false) {
+      return null;
+    }
     final name = record.clientName
         .trim()
         .replaceAll(RegExp(r'\s+'), ' ')
         .toLowerCase();
-    if (name.isEmpty) return null;
+    if (name.isEmpty) {
+      return null;
+    }
     final date =
         record.accidentDate?.toIso8601String().split('T').first ?? 'missing';
     return '$name|$date';
@@ -550,7 +568,9 @@ class ExcelService {
   static String _caseNumberValue(String input) {
     final value = input.trim();
     final date = RegExp(r'^\d{1,2}/(\d{1,2})/(\d{4})$').firstMatch(value);
-    if (date == null) return value;
+    if (date == null) {
+      return value;
+    }
     return '${date.group(1)!.padLeft(2, '0')}/${date.group(2)!}';
   }
 
@@ -567,7 +587,9 @@ class ExcelService {
 
     // ISO dates/datetimes.
     final iso = DateTime.tryParse(s);
-    if (iso != null) return DateTime(iso.year, iso.month, iso.day);
+    if (iso != null) {
+      return DateTime(iso.year, iso.month, iso.day);
+    }
 
     final yearFirst = RegExp(
       r'^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$',
@@ -594,10 +616,13 @@ class ExcelService {
   }
 
   static DateTime? _validatedDate(int year, int month, int day) {
-    if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31) return null;
-    final date = DateTime(year, month, day);
-    if (date.year != year || date.month != month || date.day != day)
+    if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31) {
       return null;
+    }
+    final date = DateTime(year, month, day);
+    if (date.year != year || date.month != month || date.day != day) {
+      return null;
+    }
     return DateTime(date.year, date.month, date.day);
   }
 }
