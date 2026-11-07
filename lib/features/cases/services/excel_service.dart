@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
@@ -152,9 +153,8 @@ class ExcelService {
       fileName: 'claimmitra-cases.xlsx',
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
+      bytes: Uint8List.fromList(bytes),
     );
-    if (path == null) return null;
-    await File(path).writeAsBytes(bytes, flush: true);
     return path;
   }
 
