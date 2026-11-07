@@ -39,13 +39,18 @@ class ExcelInvalidRow {
   String get receivedDate => record.receivedDate == null
       ? ''
       : ExcelService.formatDate(record.receivedDate!);
+  String get accidentDate => record.accidentDate == null
+      ? ''
+      : ExcelService.formatDate(record.accidentDate!);
 
   void update({
     required String clientName,
     required String caseNumber,
     required String receivedDate,
+    required String accidentDate,
   }) {
     final parsedReceivedDate = ExcelService.parseDate(receivedDate);
+    final parsedAccidentDate = ExcelService.parseDate(accidentDate);
     record = record.copyWith(
       clientName: clientName.trim(),
       caseNumber: caseNumber.trim().isEmpty
@@ -53,6 +58,8 @@ class ExcelInvalidRow {
           : ExcelService.caseNumberValue(caseNumber),
       clearCaseNumber: caseNumber.trim().isEmpty,
       receivedDate: parsedReceivedDate,
+      accidentDate: parsedAccidentDate,
+      clearAccidentDate: accidentDate.trim().isEmpty,
     );
   }
 }
@@ -257,6 +264,11 @@ class ExcelService {
         .whereType<String>()
         .where((s) => s.isNotEmpty)
         .toSet();
+    final knownNoNumberIdentities = existing
+        .where((c) => c.displayCaseNumber?.trim().isEmpty ?? true)
+        .map(_noNumberIdentity)
+        .whereType<String>()
+        .toSet();
     final records = <CaseRecord>[];
     final errors = <String>[];
     final invalidRows = <ExcelInvalidRow>[];
@@ -379,6 +391,14 @@ class ExcelService {
             knownNumbers.contains(normalizedNumber)) {
           problems.add('Case number "$number" already exists.');
         }
+        final noNumberIdentity = _noNumberIdentity(candidate);
+        if (number.isEmpty &&
+            noNumberIdentity != null &&
+            knownNoNumberIdentities.contains(noNumberIdentity)) {
+          problems.add(
+            'Possible duplicate: this Client Name and Accident Date already exist without a Case Number.',
+          );
+        }
         if (problems.isNotEmpty) {
           skipped++;
           invalidRows.add(
@@ -395,6 +415,9 @@ class ExcelService {
         records.add(candidate);
 
         if (normalizedNumber.isNotEmpty) knownNumbers.add(normalizedNumber);
+        if (noNumberIdentity != null) {
+          knownNoNumberIdentities.add(noNumberIdentity);
+        }
       } catch (e) {
         skipped++;
         errors.add('Row $displayRow: $e');
@@ -404,7 +427,10 @@ class ExcelService {
     return ExcelImportResult(records, skipped, errors, invalidRows);
   }
 
-  static Future<void> revalidate(ExcelImportResult result) async {
+  static Future<void> revalidate(
+    ExcelImportResult result, {
+    bool allowPossibleDuplicates = false,
+  }) async {
     final existing = await CaseDatabase.instance.allCases(
       includeArchived: true,
     );
@@ -419,6 +445,17 @@ class ExcelService {
       );
       if (normalized != null) knownNumbers.add(normalized);
     }
+    final knownNoNumberIdentities = result.records
+        .where((c) => c.displayCaseNumber?.trim().isEmpty ?? true)
+        .map(_noNumberIdentity)
+        .whereType<String>()
+        .toSet();
+    final existingNoNumberIdentities = existing
+        .where((c) => c.displayCaseNumber?.trim().isEmpty ?? true)
+        .map(_noNumberIdentity)
+        .whereType<String>()
+        .toSet();
+    knownNoNumberIdentities.addAll(existingNoNumberIdentities);
 
     final remaining = <ExcelInvalidRow>[];
     final errors = <String>[];
@@ -442,17 +479,31 @@ class ExcelService {
           knownNumbers.contains(normalizedNumber)) {
         problems.add('Case number "$number" already exists.');
       }
+      final candidate = row.record.copyWith(
+        caseNumber: number.isEmpty
+            ? null
+            : CaseRecord.formatCaseNumber(number, received?.year),
+        clearCaseNumber: number.isEmpty,
+        receivedDate: received,
+      );
+      final noNumberIdentity = _noNumberIdentity(candidate);
+      final possibleDuplicate =
+          number.isEmpty &&
+          noNumberIdentity != null &&
+          knownNoNumberIdentities.contains(noNumberIdentity);
+      if (possibleDuplicate && !allowPossibleDuplicates) {
+        problems.add(
+          'Possible duplicate: this Client Name and Accident Date already exist without a Case Number.',
+        );
+      }
       row.problems = problems;
       if (problems.isEmpty) {
-        row.record = row.record.copyWith(
-          caseNumber: number.isEmpty
-              ? null
-              : CaseRecord.formatCaseNumber(number, received?.year),
-          clearCaseNumber: number.isEmpty,
-          receivedDate: received,
-        );
+        row.record = candidate;
         result.records.add(row.record);
         if (normalizedNumber.isNotEmpty) knownNumbers.add(normalizedNumber);
+        if (noNumberIdentity != null) {
+          knownNoNumberIdentities.add(noNumberIdentity);
+        }
       } else {
         remaining.add(row);
         errors.addAll(
@@ -476,6 +527,18 @@ class ExcelService {
   static DateTime? parseDate(String input) => _parseDate(input);
 
   static String caseNumberValue(String input) => _caseNumberValue(input);
+
+  static String? _noNumberIdentity(CaseRecord record) {
+    if (record.displayCaseNumber?.trim().isNotEmpty ?? false) return null;
+    final name = record.clientName
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .toLowerCase();
+    if (name.isEmpty) return null;
+    final date =
+        record.accidentDate?.toIso8601String().split('T').first ?? 'missing';
+    return '$name|$date';
+  }
 
   static String _format(DateTime? date) => date == null
       ? ''

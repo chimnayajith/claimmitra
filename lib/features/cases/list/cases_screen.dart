@@ -852,6 +852,7 @@ class _ExcelImportDialog extends StatefulWidget {
 class _ExcelImportDialogState extends State<_ExcelImportDialog> {
   final Map<int, List<TextEditingController>> _controllers = {};
   bool _checking = false;
+  bool _confirmPossibleDuplicates = false;
 
   @override
   void initState() {
@@ -867,6 +868,7 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
           TextEditingController(text: row.clientName),
           TextEditingController(text: row.caseNumber),
           TextEditingController(text: row.receivedDate),
+          TextEditingController(text: row.accidentDate),
         ],
       );
     }
@@ -880,9 +882,13 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
         clientName: fields[0].text,
         caseNumber: fields[1].text,
         receivedDate: fields[2].text,
+        accidentDate: fields[3].text,
       );
     }
-    await ExcelService.revalidate(widget.preview);
+    await ExcelService.revalidate(
+      widget.preview,
+      allowPossibleDuplicates: _confirmPossibleDuplicates,
+    );
     if (mounted) {
       _createControllers();
       setState(() => _checking = false);
@@ -902,6 +908,11 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
   @override
   Widget build(BuildContext context) {
     final preview = widget.preview;
+    final hasPossibleDuplicates = preview.invalidRows.any(
+      (row) => row.problems.any(
+        (problem) => problem.startsWith('Possible duplicate:'),
+      ),
+    );
     return AlertDialog(
       title: const Text('Preview Excel import'),
       content: SizedBox(
@@ -914,11 +925,29 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('${preview.imported} valid rows ready to import.'),
-                Text('${preview.skipped} rows need correction.'),
+                Text(
+                  '${preview.skipped} rows need correction or confirmation.',
+                ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Edit the problem rows below, then select Recheck. Other spreadsheet data in these rows will be kept.',
+                  'Edit the problem rows below, then select Recheck. Other spreadsheet data in these rows will be kept. Rows without a Case Number are checked against Client Name and Accident Date.',
                 ),
+                if (hasPossibleDuplicates)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _confirmPossibleDuplicates,
+                    onChanged: _checking
+                        ? null
+                        : (value) => setState(
+                            () => _confirmPossibleDuplicates = value ?? false,
+                          ),
+                    title: const Text(
+                      'These possible duplicates are different cases',
+                    ),
+                    subtitle: const Text(
+                      'Confirm this before importing rows that have no Case Number.',
+                    ),
+                  ),
                 if (preview.invalidRows.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   SingleChildScrollView(
@@ -930,6 +959,7 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
                         DataColumn(label: Text('Client Name')),
                         DataColumn(label: Text('Case Number')),
                         DataColumn(label: Text('Received Date')),
+                        DataColumn(label: Text('Accident Date')),
                         DataColumn(label: Text('Problem')),
                       ],
                       rows: preview.invalidRows.map((row) {
@@ -955,6 +985,18 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
                                   controller: fields[1],
                                   decoration: const InputDecoration(
                                     isDense: true,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              SizedBox(
+                                width: 130,
+                                child: TextField(
+                                  controller: fields[3],
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    hintText: 'DD/MM/YYYY',
                                   ),
                                 ),
                               ),
