@@ -87,10 +87,13 @@ class _AppSidebarState extends State<AppSidebar> {
       if (!mounted) return;
 
       if (update == null) {
+        final detail = UpdateService.instance.lastCheckFailure;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'You are up to date, or the update check could not connect.',
+              detail == null
+                  ? 'You are up to date. GitHub has no newer release.'
+                  : 'Could not check for updates: $detail',
             ),
           ),
         );

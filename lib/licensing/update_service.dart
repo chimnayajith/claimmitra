@@ -17,17 +17,28 @@ class UpdateService {
 
   static const repository = 'chimnayajith/claimmitra';
   static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.8');
+  String? lastCheckFailure;
 
   Future<AvailableUpdate?> checkForUpdate() async {
+    lastCheckFailure = null;
     try {
       final response = await http.get(
         Uri.parse('https://api.github.com/repos/$repository/releases/latest'),
         headers: {'Accept': 'application/vnd.github+json', 'User-Agent': 'ClaimMitra-Updater'},
       ).timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        lastCheckFailure = 'GitHub returned HTTP ${response.statusCode}.';
+        debugPrint('ClaimMitra update check failed: $lastCheckFailure');
+        return null;
+      }
       final release = jsonDecode(response.body) as Map<String, dynamic>;
       final tag = (release['tag_name'] as String? ?? '').replaceFirst(RegExp(r'^v'), '');
-      if (tag.isEmpty || !_isNewer(tag, currentVersion)) return null;
+      if (tag.isEmpty) {
+        lastCheckFailure = 'GitHub returned no release version.';
+        return null;
+      }
+      debugPrint('ClaimMitra update check: local=$currentVersion remote=$tag');
+      if (!_isNewer(tag, currentVersion)) return null;
       final assets = (release['assets'] as List<dynamic>? ?? const []);
       final installer = assets.cast<Map<String, dynamic>>().where((asset) {
         final name = (asset['name'] as String? ?? '').toLowerCase();
@@ -43,6 +54,7 @@ class UpdateService {
       );
     } catch (error) {
       // Update checks must never prevent offline use.
+      lastCheckFailure = error.toString();
       debugPrint('ClaimMitra update check skipped: $error');
       return null;
     }
