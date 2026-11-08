@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as path;
 
 import '../../../database/case_database.dart';
 import '../models/case.dart';
@@ -152,14 +153,23 @@ class ExcelService {
       return null;
     }
 
-    final path = await FilePicker.platform.saveFile(
+    final selectedPath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export ClaimMitra cases',
       fileName: 'claimmitra-cases.xlsx',
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
       bytes: Uint8List.fromList(bytes),
     );
-    return path;
+    if (selectedPath == null || path.extension(selectedPath).toLowerCase() == '.xlsx') {
+      return selectedPath;
+    }
+
+    final xlsxPath = '$selectedPath.xlsx';
+    final selectedFile = File(selectedPath);
+    if (await selectedFile.exists()) {
+      await selectedFile.rename(xlsxPath);
+    }
+    return xlsxPath;
   }
 
   static Future<ExcelImportResult?> importCases() async {
