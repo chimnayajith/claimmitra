@@ -25,6 +25,10 @@ jobs:
       - name: Generate Windows desktop runner
         run: flutter create --platforms=windows .
 
+      - name: Prevent multiple ClaimMitra windows
+        shell: pwsh
+        run: ./scripts/ensure_windows_single_instance.ps1
+
       - name: Apply ClaimMitra branding
         shell: pwsh
         run: |
