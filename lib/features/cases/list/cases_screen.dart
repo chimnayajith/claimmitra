@@ -953,6 +953,7 @@ class _ExcelImportDialog extends StatefulWidget {
 
 class _ExcelImportDialogState extends State<_ExcelImportDialog> {
   final Map<int, List<TextEditingController>> _controllers = {};
+  final ScrollController _horizontalScrollController = ScrollController();
   bool _checking = false;
   bool _confirmPossibleDuplicates = false;
 
@@ -999,6 +1000,7 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
 
   @override
   void dispose() {
+    _horizontalScrollController.dispose();
     for (final fields in _controllers.values) {
       for (final controller in fields) {
         controller.dispose();
@@ -1052,73 +1054,80 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
                   ),
                 if (preview.invalidRows.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columnSpacing: 18,
-                      columns: const [
-                        DataColumn(label: Text('Excel row')),
-                        DataColumn(label: Text('Client Name')),
-                        DataColumn(label: Text('Case Number')),
-                        DataColumn(label: Text('Received Date')),
-                        DataColumn(label: Text('Accident Date')),
-                        DataColumn(label: Text('Problem')),
-                      ],
-                      rows: preview.invalidRows.map((row) {
-                        final fields = _controllers[row.sourceRow]!;
-                        return DataRow(
-                          cells: [
-                            DataCell(Text('${row.sourceRow}')),
-                            DataCell(
-                              SizedBox(
-                                width: 170,
-                                child: TextField(
-                                  controller: fields[0],
-                                  decoration: const InputDecoration(
-                                    isDense: true,
+                  Scrollbar(
+                    controller: _horizontalScrollController,
+                    thumbVisibility: true,
+                    trackVisibility: true,
+                    interactive: true,
+                    child: SingleChildScrollView(
+                      controller: _horizontalScrollController,
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columnSpacing: 18,
+                        columns: const [
+                          DataColumn(label: Text('Excel row')),
+                          DataColumn(label: Text('Client Name')),
+                          DataColumn(label: Text('Case Number')),
+                          DataColumn(label: Text('Received Date')),
+                          DataColumn(label: Text('Accident Date')),
+                          DataColumn(label: Text('Problem')),
+                        ],
+                        rows: preview.invalidRows.map((row) {
+                          final fields = _controllers[row.sourceRow]!;
+                          return DataRow(
+                            cells: [
+                              DataCell(Text('${row.sourceRow}')),
+                              DataCell(
+                                SizedBox(
+                                  width: 170,
+                                  child: TextField(
+                                    controller: fields[0],
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            DataCell(
-                              SizedBox(
-                                width: 130,
-                                child: TextField(
-                                  controller: fields[1],
-                                  decoration: const InputDecoration(
-                                    isDense: true,
+                              DataCell(
+                                SizedBox(
+                                  width: 130,
+                                  child: TextField(
+                                    controller: fields[1],
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            DataCell(
-                              SizedBox(
-                                width: 130,
-                                child: TextField(
-                                  controller: fields[3],
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    hintText: 'DD/MM/YYYY',
+                              DataCell(
+                                SizedBox(
+                                  width: 130,
+                                  child: TextField(
+                                    controller: fields[3],
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      hintText: 'DD/MM/YYYY',
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            DataCell(
-                              SizedBox(
-                                width: 130,
-                                child: TextField(
-                                  controller: fields[2],
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    hintText: 'DD/MM/YYYY',
+                              DataCell(
+                                SizedBox(
+                                  width: 130,
+                                  child: TextField(
+                                    controller: fields[2],
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      hintText: 'DD/MM/YYYY',
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            DataCell(Text(row.problems.join('\n'))),
-                          ],
-                        );
-                      }).toList(),
+                              DataCell(Text(row.problems.join('\n'))),
+                            ],
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ],
