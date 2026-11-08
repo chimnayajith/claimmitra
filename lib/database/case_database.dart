@@ -164,7 +164,25 @@ class CaseDatabase {
   Future<void> save(CaseRecord record) async {
     final db = await database;
     await _ensureCaseNumberAvailable(db, record);
-    await db.insert('cases', record.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    final updated = await db.update(
+      'cases',
+      record.toMap(),
+      where: 'id = ?',
+      whereArgs: [record.id],
+    );
+    if (updated == 0) {
+      await db.insert('cases', record.toMap());
+    }
+    final saved = await db.query(
+      'cases',
+      columns: ['id'],
+      where: 'id = ?',
+      whereArgs: [record.id],
+      limit: 1,
+    );
+    if (saved.isEmpty) {
+      throw StateError('Case ${record.id} was not persisted.');
+    }
   }
 
   Future<int> saveMany(List<CaseRecord> records) async {

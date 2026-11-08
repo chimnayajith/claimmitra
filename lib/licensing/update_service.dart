@@ -16,7 +16,7 @@ class UpdateService {
   static final UpdateService instance = UpdateService._();
 
   static const repository = 'chimnayajith/claimmitra';
-  static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.10');
+  static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.11');
   String? lastCheckFailure;
 
   Future<AvailableUpdate?> checkForUpdate() async {
@@ -134,13 +134,23 @@ class UpdateService {
     }
 
     final appPath = Platform.resolvedExecutable;
+    final logPath = '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        'ClaimMitra-updater.log';
     String quotePowerShell(String value) => "'${value.replaceAll("'", "''")}'";
     final script = '''
-\$appPid = $pid;
-Wait-Process -Id \$appPid -ErrorAction SilentlyContinue;
-Start-Process -FilePath ${quotePowerShell(installerPath)} -ArgumentList '/SILENT','/NORESTART' -Wait;
-Start-Process -FilePath ${quotePowerShell(appPath)};
-Remove-Item -LiteralPath ${quotePowerShell(installerPath)} -Force -ErrorAction SilentlyContinue;
+\$ErrorActionPreference = 'Stop';
+\$log = ${quotePowerShell(logPath)};
+try {
+  Add-Content -LiteralPath \$log -Value "Updater started for ${update.version}";
+  Wait-Process -Id $pid -ErrorAction SilentlyContinue;
+  Start-Process -FilePath ${quotePowerShell(installerPath)} -ArgumentList @('/SILENT','/NORESTART') -Verb RunAs -Wait;
+  Add-Content -LiteralPath \$log -Value 'Installer finished';
+  Start-Process -FilePath ${quotePowerShell(appPath)};
+  Remove-Item -LiteralPath ${quotePowerShell(installerPath)} -Force -ErrorAction SilentlyContinue;
+} catch {
+  Add-Content -LiteralPath \$log -Value ("Updater failed: " + \$_.Exception.Message);
+  Start-Process -FilePath ${quotePowerShell(appPath)};
+}
 ''';
     await Process.start(
       'powershell.exe',
