@@ -824,7 +824,12 @@ class _CasesScreenState extends State<CasesScreen> {
                                 columns: [
                                   DataColumn(label: Text('Select')),
                                   DataColumn(label: Text('Case No.')),
-                                  DataColumn(label: Text('Client Name')),
+                                  DataColumn(
+                                    label: SizedBox(
+                                      width: 220,
+                                      child: Text('Client Name'),
+                                    ),
+                                  ),
                                   DataColumn(label: Text('Current Stage')),
                                   DataColumn(label: Text('Due')),
                                   DataColumn(label: Text('Status')),
@@ -860,7 +865,16 @@ class _CasesScreenState extends State<CasesScreen> {
                                               : 'No case number',
                                         ),
                                       ),
-                                      DataCell(Text(c.clientName)),
+                                      DataCell(
+                                        SizedBox(
+                                          width: 220,
+                                          child: Text(
+                                            c.clientName,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ),
                                       DataCell(Text(_stage(c))),
                                       DataCell(Text(_due(c))),
                                       DataCell(
