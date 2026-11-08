@@ -12,6 +12,8 @@ enum CaseFilter { all, needsAttention, active, closed }
 
 enum CaseSearchScope { all, client, advocate }
 
+enum CaseSortOrder { oldestFirst, newestFirst }
+
 class CasesScreen extends StatefulWidget {
   final String? view;
   final String? stage;
@@ -25,6 +27,7 @@ class _CasesScreenState extends State<CasesScreen> {
   bool get archived => widget.archived;
   CaseFilter _filter = CaseFilter.all;
   CaseSearchScope _searchScope = CaseSearchScope.all;
+  CaseSortOrder _sortOrder = CaseSortOrder.oldestFirst;
   String _query = '';
   final Set<String> _selectedIds = <String>{};
   late Future<List<CaseRecord>> _future;
@@ -559,7 +562,11 @@ class _CasesScreenState extends State<CasesScreen> {
                       return 1;
                     }
                   }
-                  return compareCasesForList(a, b);
+                  return compareCasesByReceivedDate(
+                    a,
+                    b,
+                    descending: _sortOrder == CaseSortOrder.newestFirst,
+                  );
                 });
 
             return SingleChildScrollView(
@@ -896,6 +903,21 @@ class _CasesScreenState extends State<CasesScreen> {
                         ),
                       ),
                     ),
+                      if (widget.stage == null)
+                        OutlinedButton.icon(
+                          onPressed: () => setState(() {
+                            _sortOrder =
+                                _sortOrder == CaseSortOrder.oldestFirst
+                                    ? CaseSortOrder.newestFirst
+                                    : CaseSortOrder.oldestFirst;
+                          }),
+                          icon: const Icon(Icons.swap_vert),
+                          label: Text(
+                            _sortOrder == CaseSortOrder.oldestFirst
+                                ? 'Oldest first'
+                                : 'Newest first',
+                          ),
+                        ),
                 ],
               ),
             );

@@ -22,6 +22,20 @@ void main() {
       'older-year',
     ]);
   });
+
+  test('sorts cases by received date from oldest to newest', () {
+    final cases = [
+      _case('newest', null, DateTime(2026, 9, 1)),
+      _case('oldest', null, DateTime(2025, 12, 1)),
+      _case('middle', null, DateTime(2026, 3, 1)),
+    ]..sort(compareCasesByReceivedDate);
+
+    expect(cases.map((c) => c.id).toList(), [
+      'oldest',
+      'middle',
+      'newest',
+    ]);
+  });
 }
 
 CaseRecord _case(String id, String? caseNumber, DateTime receivedDate) {

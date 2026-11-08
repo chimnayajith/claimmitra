@@ -31,3 +31,21 @@ int compareCasesForList(CaseRecord a, CaseRecord b) {
 
   return a.clientName.toLowerCase().compareTo(b.clientName.toLowerCase());
 }
+
+int compareCasesByReceivedDate(
+  CaseRecord a,
+  CaseRecord b, {
+  bool descending = false,
+}) {
+  if (a.receivedDate == null && b.receivedDate == null) {
+    return a.clientName.toLowerCase().compareTo(b.clientName.toLowerCase());
+  }
+  if (a.receivedDate == null) return 1;
+  if (b.receivedDate == null) return -1;
+
+  final dateComparison = a.receivedDate!.compareTo(b.receivedDate!);
+  if (dateComparison != 0) {
+    return descending ? -dateComparison : dateComparison;
+  }
+  return a.clientName.toLowerCase().compareTo(b.clientName.toLowerCase());
+}
