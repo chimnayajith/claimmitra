@@ -30,6 +30,7 @@ class _CasesScreenState extends State<CasesScreen> {
   CaseSortOrder _sortOrder = CaseSortOrder.oldestFirst;
   String _query = '';
   final Set<String> _selectedIds = <String>{};
+  bool _selectionMode = false;
   late Future<List<CaseRecord>> _future;
 
   @override
@@ -696,39 +697,50 @@ class _CasesScreenState extends State<CasesScreen> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      TextButton.icon(
-                        onPressed: cases.isEmpty
-                            ? null
-                            : () {
-                                setState(() {
-                                  final visibleIds = cases
-                                      .map((c) => c.id)
-                                      .toSet();
-                                  if (visibleIds.isNotEmpty &&
-                                      visibleIds.every(_selectedIds.contains)) {
-                                    _selectedIds.removeAll(visibleIds);
-                                  } else {
-                                    _selectedIds.addAll(visibleIds);
-                                  }
-                                });
-                              },
-                        icon: Icon(
-                          cases.isNotEmpty &&
-                                  cases.every(
-                                    (c) => _selectedIds.contains(c.id),
-                                  )
-                              ? Icons.deselect
-                              : Icons.select_all,
+                      if (!_selectionMode)
+                        OutlinedButton.icon(
+                          onPressed: cases.isEmpty
+                              ? null
+                              : () => setState(() => _selectionMode = true),
+                          icon: const Icon(Icons.check_box_outlined),
+                          label: const Text('Select'),
+                        )
+                      else
+                        TextButton.icon(
+                          onPressed: cases.isEmpty
+                              ? null
+                              : () {
+                                  setState(() {
+                                    final visibleIds = cases
+                                        .map((c) => c.id)
+                                        .toSet();
+                                    if (visibleIds.isNotEmpty &&
+                                        visibleIds.every(
+                                          _selectedIds.contains,
+                                        )) {
+                                      _selectedIds.removeAll(visibleIds);
+                                    } else {
+                                      _selectedIds.addAll(visibleIds);
+                                    }
+                                  });
+                                },
+                          icon: Icon(
+                            cases.isNotEmpty &&
+                                    cases.every(
+                                      (c) => _selectedIds.contains(c.id),
+                                    )
+                                ? Icons.deselect
+                                : Icons.select_all,
+                          ),
+                          label: Text(
+                            cases.isNotEmpty &&
+                                    cases.every(
+                                      (c) => _selectedIds.contains(c.id),
+                                    )
+                                ? 'Deselect all visible'
+                                : 'Select all visible',
+                          ),
                         ),
-                        label: Text(
-                          cases.isNotEmpty &&
-                                  cases.every(
-                                    (c) => _selectedIds.contains(c.id),
-                                  )
-                              ? 'Deselect all visible'
-                              : 'Select all visible',
-                        ),
-                      ),
                       const Spacer(),
                       if (_selectedIds.isNotEmpty) ...[
                         Text('${_selectedIds.length} selected'),
@@ -750,6 +762,16 @@ class _CasesScreenState extends State<CasesScreen> {
                             label: const Text('Delete permanently'),
                           ),
                         ],
+                      ],
+                      if (_selectionMode) ...[
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () => setState(() {
+                            _selectionMode = false;
+                            _selectedIds.clear();
+                          }),
+                          child: const Text('Cancel'),
+                        ),
                       ],
                     ],
                   ),
@@ -822,7 +844,8 @@ class _CasesScreenState extends State<CasesScreen> {
                                   });
                                 },
                                 columns: [
-                                  DataColumn(label: Text('Select')),
+                                  if (_selectionMode)
+                                    DataColumn(label: Text('Select')),
                                   DataColumn(label: Text('Case No.')),
                                   DataColumn(
                                     label: SizedBox(
@@ -841,20 +864,28 @@ class _CasesScreenState extends State<CasesScreen> {
                                   return DataRow(
                                     selected: _selectedIds.contains(c.id),
                                     onSelectChanged: (_) async {
+                                      if (_selectionMode) {
+                                        _toggleSelected(
+                                          c.id,
+                                          !_selectedIds.contains(c.id),
+                                        );
+                                        return;
+                                      }
                                       await context.push('/cases/${c.id}');
                                       if (mounted) _refresh();
                                     },
                                     cells: [
-                                      DataCell(
-                                        Checkbox(
-                                          value: _selectedIds.contains(c.id),
-                                          onChanged: (selected) =>
-                                              _toggleSelected(
-                                                c.id,
-                                                selected ?? false,
-                                              ),
+                                      if (_selectionMode)
+                                        DataCell(
+                                          Checkbox(
+                                            value: _selectedIds.contains(c.id),
+                                            onChanged: (selected) =>
+                                                _toggleSelected(
+                                                  c.id,
+                                                  selected ?? false,
+                                                ),
+                                          ),
                                         ),
-                                      ),
                                       DataCell(
                                         Text(
                                           (c.displayCaseNumber
