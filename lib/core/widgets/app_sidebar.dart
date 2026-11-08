@@ -125,7 +125,15 @@ class _AppSidebarState extends State<AppSidebar> {
       );
 
       if (openUpdate == true && mounted) {
-        await UpdateService.instance.openDownload(update.downloadUrl);
+        try {
+          await UpdateService.instance.downloadAndInstall(update);
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Update failed: $error')),
+            );
+          }
+        }
       }
     } catch (error) {
       debugPrint('Update check failed: $error');

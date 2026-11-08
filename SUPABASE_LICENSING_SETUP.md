@@ -7,7 +7,7 @@ This is the database-backed licensing design:
 3. The customer enters the key in ClaimMitra.
 4. The `activate` Edge Function checks Supabase and atomically binds the licence to the first computer.
 5. The function returns a signed activation token. ClaimMitra stores it locally and verifies it offline on later launches. **This token is generated automatically by the server; you do not send a separate signed licence file to the customer.**
-6. ClaimMitra checks GitHub Releases for updates and offers to open the new installer download.
+6. ClaimMitra checks GitHub Releases at startup and can download and install a newer Windows release from inside the app.
 
 ## What the files are for
 
@@ -17,7 +17,7 @@ This is the database-backed licensing design:
 - `scripts/create_license.sh`: calls that admin-only endpoint so you can issue keys from your own computer.
 - `scripts/generate_licensing_keys.sh`: creates the Ed25519 signing key pair used to sign offline activation tokens. This is **not** a customer licence-file generator. Keep the private key secret.
 - `lib/licensing/activation_screen.dart` and `license_service.dart`: customer activation and local token verification.
-- `lib/licensing/update_service.dart` and `update_prompt.dart`: GitHub update checking and installer download prompt.
+- `lib/licensing/update_service.dart` and `update_prompt.dart`: GitHub update checking, background installer download, and Windows restart handoff.
 
 ## 1. Supabase project
 
@@ -96,5 +96,5 @@ For a legitimate computer replacement, confirm the customer's identity and then 
 
 - The fingerprint hashes Windows `MachineGuid`. Windows reinstallation can change it, and it is not impossible to spoof.
 - Offline activation cannot be revoked immediately while a customer remains offline.
-- The update feature checks GitHub Releases and offers a download; it does not silently install updates.
+- The update feature downloads the signed GitHub Release installer in-app, then asks Windows for the normal installer elevation when the app restarts.
 - The code has not yet been validated with `flutter analyze`, a Windows build, or an end-to-end activation test. Test it before selling.

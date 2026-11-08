@@ -16,7 +16,7 @@ class UpdateService {
   static final UpdateService instance = UpdateService._();
 
   static const repository = 'chimnayajith/claimmitra';
-  static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.8');
+  static const currentVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.9');
   String? lastCheckFailure;
 
   Future<AvailableUpdate?> checkForUpdate() async {
@@ -44,9 +44,11 @@ class UpdateService {
         final name = (asset['name'] as String? ?? '').toLowerCase();
         return name.endsWith('.exe') && name.contains('claimmitra-setup');
       }).firstOrNull;
-      final url = installer?['browser_download_url'] as String? ??
-          release['html_url'] as String? ??
-          'https://github.com/$repository/releases/latest';
+      final url = installer?['browser_download_url'] as String?;
+      if (url == null || url.isEmpty) {
+        lastCheckFailure = 'The latest release has no ClaimMitra installer asset.';
+        return null;
+      }
       return AvailableUpdate(
         version: tag,
         notes: (release['body'] as String? ?? '').trim(),
@@ -77,8 +79,84 @@ class UpdateService {
 
   bool _isNewer(String remote, String local) => isNewerVersion(remote, local);
 
-  Future<void> openDownload(String url) async {
-    if (!Platform.isWindows) return;
-    await Process.start('cmd', ['/c', 'start', '', url], runInShell: true);
+  Future<void> downloadAndInstall(
+    AvailableUpdate update, {
+    void Function(double? progress)? onProgress,
+  }) async {
+    if (!Platform.isWindows) {
+      throw UnsupportedError('In-app updates are only available on Windows.');
+    }
+
+    final safeVersion = update.version.replaceAll(
+      RegExp(r'[^0-9A-Za-z._-]'),
+      '_',
+    );
+    final installerPath = '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        'ClaimMitra-Setup-$safeVersion.exe';
+    final installerFile = File(installerPath);
+    if (await installerFile.exists()) {
+      await installerFile.delete();
+    }
+
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', Uri.parse(update.downloadUrl));
+      final response = await client.send(request).timeout(
+        const Duration(minutes: 10),
+      );
+      if (response.statusCode != 200) {
+        throw HttpException(
+          'Installer download failed with HTTP ${response.statusCode}.',
+        );
+      }
+
+      final sink = installerFile.openWrite();
+      var received = 0;
+      try {
+        await for (final chunk in response.stream) {
+          sink.add(chunk);
+          received += chunk.length;
+          final total = response.contentLength;
+          onProgress?.call(
+            total == null || total <= 0 ? null : received / total,
+          );
+        }
+        await sink.flush();
+      } finally {
+        await sink.close();
+      }
+    } finally {
+      client.close();
+    }
+
+    if (!await installerFile.exists() || await installerFile.length() == 0) {
+      throw const FileSystemException('The downloaded installer was empty.');
+    }
+
+    final appPath = Platform.resolvedExecutable;
+    String quotePowerShell(String value) => "'${value.replaceAll("'", "''")}'";
+    final script = '''
+\$appPid = $pid;
+Wait-Process -Id \$appPid -ErrorAction SilentlyContinue;
+Start-Process -FilePath ${quotePowerShell(installerPath)} -ArgumentList '/SILENT','/NORESTART' -Wait;
+Start-Process -FilePath ${quotePowerShell(appPath)};
+Remove-Item -LiteralPath ${quotePowerShell(installerPath)} -Force -ErrorAction SilentlyContinue;
+''';
+    await Process.start(
+      'powershell.exe',
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-WindowStyle',
+        'Hidden',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        script,
+      ],
+      mode: ProcessStartMode.detached,
+    );
+    exit(0);
   }
 }

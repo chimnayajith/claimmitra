@@ -1,6 +1,6 @@
 
 #define MyAppName "ClaimMitra"
-#define MyAppVersion "1.0.8"
+#define MyAppVersion "1.0.9"
 #define MyAppPublisher "ClaimMitra"
 #define MyAppExeName "ClaimMitra.exe"
 #define VCRedistVersion GetFileVersion("..\dist\vc_redist.x64.exe")

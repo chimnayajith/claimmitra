@@ -12,6 +12,8 @@ class UpdatePrompt extends StatefulWidget {
 
 class _UpdatePromptState extends State<UpdatePrompt> {
   bool _checked = false;
+  bool _downloading = false;
+  double? _progress;
 
   @override
   void didChangeDependencies() {
@@ -41,21 +43,49 @@ class _UpdatePromptState extends State<UpdatePrompt> {
                 const SizedBox(height: 6),
                 Text(update.notes),
               ],
+              if (_downloading) ...[
+                const SizedBox(height: 20),
+                LinearProgressIndicator(value: _progress),
+                const SizedBox(height: 8),
+                Text(
+                  _progress == null
+                      ? 'Downloading the update...'
+                      : 'Downloading ${(100 * _progress!).round()}%',
+                ),
+              ],
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Later')),
+          TextButton(
+            onPressed: _downloading ? null : () => Navigator.pop(dialogContext),
+            child: const Text('Later'),
+          ),
           FilledButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              try {
-                await UpdateService.instance.openDownload(update.downloadUrl);
-              } catch (error) {
-                debugPrint('Could not open ClaimMitra download: $error');
-              }
-            },
-            child: const Text('Download update'),
+            onPressed: _downloading
+                ? null
+                : () async {
+                    setState(() {
+                      _downloading = true;
+                      _progress = null;
+                    });
+                    try {
+                      await UpdateService.instance.downloadAndInstall(
+                        update,
+                        onProgress: (progress) {
+                          if (mounted) setState(() => _progress = progress);
+                        },
+                      );
+                    } catch (error) {
+                      if (mounted) {
+                        setState(() => _downloading = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Update failed: $error')),
+                        );
+                      }
+                    }
+                  },
+            child: Text(_downloading ? 'Downloading...' : 'Update now'),
           ),
         ],
       ),
