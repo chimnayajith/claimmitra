@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -202,10 +204,12 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
     DateTime? prior;
     if (controller == _received) prior = _parse(_accident.text);
     if (controller == _police) prior = _parse(_received.text);
-    if (controller == _filed)
+    if (controller == _filed) {
       prior = _hasCaseNumber ? _parse(_received.text) : _parse(_police.text);
-    if (controller == _evidence)
+    }
+    if (controller == _evidence) {
       prior = _hasCaseNumber ? _parse(_received.text) : _parse(_filed.text);
+    }
     if (controller == _award) prior = _parse(_evidence.text);
     if (controller == _deposit) prior = _parse(_award.text);
     if (controller == _fees) prior = _parse(_deposit.text);
@@ -294,10 +298,11 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       final date = entry.value;
       if (date != null &&
           date.isAfter(DateTime(today.year, today.month, today.day))) {
-        if (!silent)
+        if (!silent) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${entry.key} cannot be in the future.')),
           );
+        }
         return;
       }
     }
@@ -305,7 +310,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
     if (accidentDate != null &&
         dates['Case Received Date'] != null &&
         accidentDate.isAfter(dates['Case Received Date']!)) {
-      if (!silent)
+      if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -313,6 +318,7 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             ),
           ),
         );
+      }
       return;
     }
     final receivedDate = dates['Case Received Date'];
@@ -360,17 +366,18 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       final earlier = pair.$2;
       final later = pair.$4;
       if (earlier != null && later != null && later.isBefore(earlier)) {
-        if (!silent)
+        if (!silent) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${pair.$3} cannot be before ${pair.$1}.')),
           );
+        }
         return;
       }
     }
     if (epDate != null &&
         awardDate != null &&
         epDate.isBefore(DeadlineService.addMonths(awardDate, 4))) {
-      if (!silent)
+      if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -378,10 +385,11 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             ),
           ),
         );
+      }
       return;
     }
     if (epDate != null && depositDate != null) {
-      if (!silent)
+      if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -389,11 +397,12 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             ),
           ),
         );
+      }
       return;
     }
     if (_caseYear.text.trim().isNotEmpty !=
         _caseSequence.text.trim().isNotEmpty) {
-      if (!silent)
+      if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -401,12 +410,13 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             ),
           ),
         );
+      }
       return;
     }
     if (_caseYear.text.trim().isNotEmpty &&
         (!RegExp(r'^\d{4}$').hasMatch(_caseYear.text.trim()) ||
             !RegExp(r'^\d+$').hasMatch(_caseSequence.text.trim()))) {
-      if (!silent)
+      if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -414,15 +424,17 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
             ),
           ),
         );
+      }
       return;
     }
     if (!_phoneValidForSave) {
-      if (!silent)
+      if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Phone number must contain exactly 10 digits.'),
           ),
         );
+      }
       return;
     }
     final received = _parse(_received.text);
@@ -488,10 +500,11 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
       if (_saveQueued) {
         _scheduleAutosave();
       }
-      if (!silent)
+      if (!silent) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Case saved.')));
+      }
       if (_isNew) context.pop(record.id);
     } catch (e) {
       debugPrint('Case save failed for ${record.id}: $e');
@@ -564,8 +577,9 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (!_isNew && _record == null)
+    if (!_isNew && _record == null) {
       return const Center(child: Text('Case not found.'));
+    }
     final received = _parse(_received.text);
     final award = _parse(_award.text);
     final deposit = _parse(_deposit.text);
@@ -1182,20 +1196,24 @@ class _CaseDetailsScreenState extends State<CaseDetailsScreen> {
         : TextInputType.text,
     validator: (v) {
       if (requiredField && (v == null || v.trim().isEmpty)) return 'Required';
-      if (label == 'Phone Number' && !_phoneValidForSave)
+      if (label == 'Phone Number' && !_phoneValidForSave) {
         return 'Enter exactly 10 digits';
+      }
       if ((label == 'Case Year' &&
           v != null &&
           v.trim().isNotEmpty &&
-          !RegExp(r'^\d{4}$').hasMatch(v.trim())))
+          !RegExp(r'^\d{4}$').hasMatch(v.trim()))) {
         return 'Enter a 4-digit year';
+      }
       if (label == 'Case Number' &&
           v != null &&
           v.trim().isNotEmpty &&
-          !RegExp(r'^\d+$').hasMatch(v.trim()))
+          !RegExp(r'^\d+$').hasMatch(v.trim())) {
         return 'Enter digits only';
-      if (numeric && v != null && v.trim().isNotEmpty && _money(v) == null)
+      }
+      if (numeric && v != null && v.trim().isNotEmpty && _money(v) == null) {
         return 'Enter a valid amount';
+      }
       return null;
     },
     decoration: InputDecoration(labelText: label),
