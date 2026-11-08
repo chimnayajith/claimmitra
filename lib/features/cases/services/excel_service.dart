@@ -113,7 +113,10 @@ class ExcelService {
     };
   }
 
-  static Future<String?> exportCases(List<CaseRecord> cases) async {
+  static Future<String?> exportCases(
+    List<CaseRecord> cases, {
+    String fileName = 'claimmitra-cases.xlsx',
+  }) async {
     final excel = Excel.createExcel();
     final sheet = excel['Cases'];
     sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
@@ -155,7 +158,7 @@ class ExcelService {
 
     final selectedPath = await FilePicker.platform.saveFile(
       dialogTitle: 'Export ClaimMitra cases',
-      fileName: 'claimmitra-cases.xlsx',
+      fileName: fileName,
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
       bytes: Uint8List.fromList(bytes),

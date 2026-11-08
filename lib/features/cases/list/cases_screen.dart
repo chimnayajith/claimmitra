@@ -518,6 +518,62 @@ class _CasesScreenState extends State<CasesScreen> {
     }
   }
 
+  DateTime? _closedDate(CaseRecord c) {
+    if (c.executionDepositDate != null) {
+      return c.executionDepositDate;
+    }
+    if (c.depositDate != null && c.feesReceivedDate != null) {
+      return c.feesReceivedDate;
+    }
+    return null;
+  }
+
+  Future<void> _exportClosedMonth() async {
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      helpText: 'Choose any date in the month to export',
+    );
+    if (selectedDate == null || !mounted) {
+      return;
+    }
+
+    try {
+      final records = (await CaseDatabase.instance.allCases(
+        includeArchived: true,
+      )).where((c) {
+        if (!c.isClosed || (!archived && c.isArchived)) {
+          return false;
+        }
+        final closedDate = _closedDate(c);
+        return closedDate?.year == selectedDate.year &&
+            closedDate?.month == selectedDate.month;
+      }).toList();
+      final month = selectedDate.month.toString().padLeft(2, '0');
+      final path = await ExcelService.exportCases(
+        records,
+        fileName: 'claimmitra-closed-${selectedDate.year}-$month.xlsx',
+      );
+      if (mounted && path != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Exported ${records.length} closed case${records.length == 1 ? '' : 's'} to $path',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Closed-case export failed: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return CallbackShortcuts(
@@ -552,6 +608,13 @@ class _CasesScreenState extends State<CasesScreen> {
                   };
                   return matchesPreset && matchesQuery && matchesFilter;
                 }).toList()..sort((a, b) {
+                  if (_filter == CaseFilter.closed) {
+                    final ad = _closedDate(a);
+                    final bd = _closedDate(b);
+                    if (ad != null && bd != null) return bd.compareTo(ad);
+                    if (ad != null) return -1;
+                    if (bd != null) return 1;
+                  }
                   if (widget.stage != null) {
                     final ad = _deadlineFor(a);
                     final bd = _deadlineFor(b);
@@ -613,6 +676,11 @@ class _CasesScreenState extends State<CasesScreen> {
                               ? 'Export archived Excel'
                               : 'Export active Excel',
                         ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _exportClosedMonth,
+                        icon: const Icon(Icons.calendar_month_outlined),
+                        label: const Text('Export closed month'),
                       ),
                     ],
                   ),
