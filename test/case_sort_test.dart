@@ -30,10 +30,20 @@ void main() {
       _case('middle', null, DateTime(2026, 3, 1)),
     ]..sort(compareCasesByReceivedDate);
 
+    expect(cases.map((c) => c.id).toList(), ['oldest', 'middle', 'newest']);
+  });
+
+  test('keeps numbered cases above unnumbered cases within the same year', () {
+    final cases = [
+      _case('unnumbered-2026', null, DateTime(2026, 1, 1)),
+      _case('numbered-2026', '001/2026', DateTime(2026, 6, 1)),
+      _case('numbered-2025', '001/2025', DateTime(2025, 6, 1)),
+    ]..sort(compareCasesForChronologicalList);
+
     expect(cases.map((c) => c.id).toList(), [
-      'oldest',
-      'middle',
-      'newest',
+      'numbered-2025',
+      'numbered-2026',
+      'unnumbered-2026',
     ]);
   });
 }

@@ -541,16 +541,17 @@ class _CasesScreenState extends State<CasesScreen> {
     }
 
     try {
-      final records = (await CaseDatabase.instance.allCases(
-        includeArchived: true,
-      )).where((c) {
-        if (!c.isClosed || (!archived && c.isArchived)) {
-          return false;
-        }
-        final closedDate = _closedDate(c);
-        return closedDate?.year == selectedDate.year &&
-            closedDate?.month == selectedDate.month;
-      }).toList();
+      final records =
+          (await CaseDatabase.instance.allCases(includeArchived: true)).where((
+            c,
+          ) {
+            if (!c.isClosed || (!archived && c.isArchived)) {
+              return false;
+            }
+            final closedDate = _closedDate(c);
+            return closedDate?.year == selectedDate.year &&
+                closedDate?.month == selectedDate.month;
+          }).toList();
       final month = selectedDate.month.toString().padLeft(2, '0');
       final path = await ExcelService.exportCases(
         records,
@@ -626,7 +627,7 @@ class _CasesScreenState extends State<CasesScreen> {
                       return 1;
                     }
                   }
-                  return compareCasesByReceivedDate(
+                  return compareCasesForChronologicalList(
                     a,
                     b,
                     descending: _sortOrder == CaseSortOrder.newestFirst,
@@ -677,11 +678,12 @@ class _CasesScreenState extends State<CasesScreen> {
                               : 'Export active Excel',
                         ),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: _exportClosedMonth,
-                        icon: const Icon(Icons.calendar_month_outlined),
-                        label: const Text('Export closed month'),
-                      ),
+                      if (_filter == CaseFilter.closed)
+                        OutlinedButton.icon(
+                          onPressed: _exportClosedMonth,
+                          icon: const Icon(Icons.calendar_month_outlined),
+                          label: const Text('Export closed month'),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -809,6 +811,22 @@ class _CasesScreenState extends State<CasesScreen> {
                                 : 'Select all visible',
                           ),
                         ),
+                      if (widget.stage == null) ...[
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () => setState(() {
+                            _sortOrder = _sortOrder == CaseSortOrder.oldestFirst
+                                ? CaseSortOrder.newestFirst
+                                : CaseSortOrder.oldestFirst;
+                          }),
+                          icon: const Icon(Icons.swap_vert),
+                          label: Text(
+                            _sortOrder == CaseSortOrder.oldestFirst
+                                ? 'Oldest first'
+                                : 'Newest first',
+                          ),
+                        ),
+                      ],
                       const Spacer(),
                       if (_selectedIds.isNotEmpty) ...[
                         Text('${_selectedIds.length} selected'),
@@ -1016,21 +1034,6 @@ class _CasesScreenState extends State<CasesScreen> {
                         ),
                       ),
                     ),
-                      if (widget.stage == null)
-                        OutlinedButton.icon(
-                          onPressed: () => setState(() {
-                            _sortOrder =
-                                _sortOrder == CaseSortOrder.oldestFirst
-                                    ? CaseSortOrder.newestFirst
-                                    : CaseSortOrder.oldestFirst;
-                          }),
-                          icon: const Icon(Icons.swap_vert),
-                          label: Text(
-                            _sortOrder == CaseSortOrder.oldestFirst
-                                ? 'Oldest first'
-                                : 'Newest first',
-                          ),
-                        ),
                 ],
               ),
             );
